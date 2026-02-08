@@ -1,0 +1,70 @@
+<?php
+/**
+ * Platform Provider Factory
+ *
+ * Creates the correct inventory-sync provider based on the vendor's configured platform.
+ * Currently supports "square". Adding a new platform (e.g. Shopify) only requires:
+ *   1. Creating a new class that implements WCSS_Platform_Provider_Interface.
+ *   2. Registering it in the $providers map below.
+ *   3. Setting 'platform' => 'shopify' in vendor-config.php for the relevant vendor.
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Interface that every platform provider must implement.
+ */
+interface WCSS_Platform_Provider_Interface {
+
+    /**
+     * Fetch inventory counts for a list of SKUs from the external platform.
+     *
+     * @param array $skus List of product SKUs to look up.
+     * @return array Associative array of SKU => quantity (int). SKUs not found should be omitted.
+     */
+    public function get_inventory_counts( array $skus );
+
+    /**
+     * Adjust (decrement) inventory on the external platform after a WooCommerce sale.
+     *
+     * @param string $sku   The product SKU.
+     * @param int    $quantity The quantity sold (positive number to subtract).
+     * @return bool True on success, false on failure.
+     */
+    public function adjust_inventory( $sku, $quantity );
+}
+
+class WCSS_Platform_Factory {
+
+    /**
+     * Map of platform slug => class name.
+     *
+     * @var array
+     */
+    private static $providers = array(
+        'square' => 'WCSS_Square_Provider',
+        // 'shopify' => 'WCSS_Shopify_Provider',  // future
+    );
+
+    /**
+     * Create a provider instance for the given vendor config.
+     *
+     * @param array $vendor_config Normalized vendor configuration array.
+     * @return WCSS_Platform_Provider_Interface
+     * @throws InvalidArgumentException If the platform is not supported.
+     */
+    public static function create( array $vendor_config ) {
+        $platform = isset( $vendor_config['platform'] ) ? $vendor_config['platform'] : 'square';
+
+        if ( ! isset( self::$providers[ $platform ] ) ) {
+            throw new InvalidArgumentException(
+                sprintf( 'Unsupported inventory platform: %s', esc_html( $platform ) )
+            );
+        }
+
+        $class = self::$providers[ $platform ];
+        return new $class( $vendor_config );
+    }
+}
