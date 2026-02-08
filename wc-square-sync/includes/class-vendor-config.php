@@ -3,6 +3,7 @@
  * Vendor Configuration Registry
  *
  * Loads the vendor list from vendor-config.php and provides lookup methods.
+ * Validates platform-specific required fields (Square vs Shopify).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,6 +17,16 @@ class WCSS_Vendor_Config {
 
     /** @var int Default sync interval in seconds (6 hours). */
     const DEFAULT_SYNC_INTERVAL = 21600;
+
+    /**
+     * Required fields per platform.
+     *
+     * @var array
+     */
+    private static $platform_required_fields = array(
+        'square'  => array( 'square_access_token', 'square_location_id' ),
+        'shopify' => array( 'shopify_shop_domain', 'shopify_access_token', 'shopify_location_id' ),
+    );
 
     /**
      * Load vendor configurations from the config file.
@@ -69,7 +80,7 @@ class WCSS_Vendor_Config {
     }
 
     /**
-     * Validate that a vendor config has required fields.
+     * Validate that a vendor config has required fields for its platform.
      *
      * @param int   $vendor_id
      * @param mixed $config
@@ -80,12 +91,23 @@ class WCSS_Vendor_Config {
             return false;
         }
 
-        $required = array( 'square_access_token', 'square_location_id' );
+        $platform = isset( $config['platform'] ) ? $config['platform'] : 'square';
+
+        if ( ! isset( self::$platform_required_fields[ $platform ] ) ) {
+            if ( class_exists( 'WCSS_Logger' ) ) {
+                WCSS_Logger::warning(
+                    sprintf( 'Vendor %d has unsupported platform "%s" — skipped.', $vendor_id, $platform )
+                );
+            }
+            return false;
+        }
+
+        $required = self::$platform_required_fields[ $platform ];
         foreach ( $required as $field ) {
             if ( empty( $config[ $field ] ) ) {
                 if ( class_exists( 'WCSS_Logger' ) ) {
                     WCSS_Logger::warning(
-                        sprintf( 'Vendor %d is missing required field "%s" — skipped.', $vendor_id, $field )
+                        sprintf( 'Vendor %d (%s) is missing required field "%s" — skipped.', $vendor_id, $platform, $field )
                     );
                 }
                 return false;

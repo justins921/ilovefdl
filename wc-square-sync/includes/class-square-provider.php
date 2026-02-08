@@ -3,10 +3,12 @@
  * Square Inventory Provider
  *
  * Implements the platform provider interface for Square.
- * Uses the Square Inventory API (v2) to read and adjust inventory counts.
+ * Uses the Square Inventory API (v2) to read and adjust inventory counts,
+ * and the Catalog API to fetch products for import.
  *
  * Square API docs referenced:
  *   - Catalog search by SKU: POST /v2/catalog/search-catalog-items
+ *   - Catalog list:          GET  /v2/catalog/list
  *   - Batch retrieve inventory: POST /v2/inventory/batch-retrieve-counts
  *   - Batch change inventory:   POST /v2/inventory/batch-change
  */
@@ -123,6 +125,166 @@ class WCSS_Square_Provider implements WCSS_Platform_Provider_Interface {
         return true;
     }
 
+    /**
+     * Fetch all products from the Square catalog for import into WooCommerce.
+     *
+     * Uses the List Catalog endpoint to page through all ITEM objects,
+     * then enriches each with inventory counts.
+     *
+     * @return array List of normalized product arrays.
+     */
+    public function get_products() {
+        $products = array();
+        $cursor   = null;
+
+        do {
+            $endpoint = '/catalog/list?types=ITEM';
+            if ( $cursor ) {
+                $endpoint .= '&cursor=' . urlencode( $cursor );
+            }
+
+            $response = $this->request( 'GET', $endpoint );
+
+            if ( is_wp_error( $response ) ) {
+                WCSS_Logger::error(
+                    sprintf( 'Square: catalog list failed: %s', $response->get_error_message() )
+                );
+                break;
+            }
+
+            $objects = isset( $response['objects'] ) ? $response['objects'] : array();
+            $cursor  = isset( $response['cursor'] ) ? $response['cursor'] : null;
+
+            foreach ( $objects as $object ) {
+                if ( 'ITEM' !== ( $object['type'] ?? '' ) ) {
+                    continue;
+                }
+
+                $item_data = $object['item_data'] ?? array();
+                $name      = $item_data['name'] ?? '';
+                $desc      = $item_data['description'] ?? '';
+                $category  = $item_data['category_name'] ?? '';
+
+                // Collect image URLs from image_ids if present.
+                $images = array();
+                if ( ! empty( $item_data['image_ids'] ) ) {
+                    foreach ( $item_data['image_ids'] as $image_id ) {
+                        $img_response = $this->request( 'GET', '/catalog/object/' . $image_id );
+                        if ( ! is_wp_error( $img_response ) && isset( $img_response['object']['image_data']['url'] ) ) {
+                            $images[] = $img_response['object']['image_data']['url'];
+                        }
+                    }
+                }
+
+                $variations_raw = $item_data['variations'] ?? array();
+
+                // Single-variation items are treated as simple products.
+                if ( count( $variations_raw ) === 1 ) {
+                    $var      = $variations_raw[0];
+                    $var_data = $var['item_variation_data'] ?? array();
+                    $sku      = $var_data['sku'] ?? '';
+                    $price    = isset( $var_data['price_money']['amount'] )
+                        ? number_format( $var_data['price_money']['amount'] / 100, 2, '.', '' )
+                        : '0.00';
+
+                    $products[] = array(
+                        'name'        => $name,
+                        'description' => $desc,
+                        'sku'         => $sku,
+                        'price'       => $price,
+                        'stock'       => null, // populated below in batch
+                        'images'      => $images,
+                        'categories'  => $category ? array( $category ) : array(),
+                        'variations'  => array(),
+                        'weight'      => '',
+                        'status'      => 'active',
+                        '_variation_ids' => array( $sku => $var['id'] ),
+                    );
+                } else {
+                    // Multi-variation → variable product.
+                    $vars          = array();
+                    $variation_ids = array();
+                    foreach ( $variations_raw as $var ) {
+                        $var_data = $var['item_variation_data'] ?? array();
+                        $vsku     = $var_data['sku'] ?? '';
+                        $vprice   = isset( $var_data['price_money']['amount'] )
+                            ? number_format( $var_data['price_money']['amount'] / 100, 2, '.', '' )
+                            : '0.00';
+                        $vname    = $var_data['name'] ?? $vsku;
+
+                        $vars[] = array(
+                            'name'       => $vname,
+                            'sku'        => $vsku,
+                            'price'      => $vprice,
+                            'stock'      => null,
+                            'attributes' => array(
+                                'Variation' => $vname,
+                            ),
+                        );
+                        if ( $vsku ) {
+                            $variation_ids[ $vsku ] = $var['id'];
+                        }
+                    }
+
+                    $products[] = array(
+                        'name'        => $name,
+                        'description' => $desc,
+                        'sku'         => '',
+                        'price'       => '',
+                        'stock'       => null,
+                        'images'      => $images,
+                        'categories'  => $category ? array( $category ) : array(),
+                        'variations'  => $vars,
+                        'weight'      => '',
+                        'status'      => 'active',
+                        '_variation_ids' => $variation_ids,
+                    );
+                }
+            }
+        } while ( $cursor );
+
+        // Enrich products with inventory counts.
+        $all_variation_ids = array();
+        foreach ( $products as $product ) {
+            if ( ! empty( $product['_variation_ids'] ) ) {
+                $all_variation_ids = array_merge( $all_variation_ids, $product['_variation_ids'] );
+            }
+        }
+
+        $inventory_counts = array();
+        if ( ! empty( $all_variation_ids ) ) {
+            $inventory_counts = $this->batch_retrieve_counts( array_values( $all_variation_ids ) );
+        }
+
+        // Map inventory back to SKUs on each product.
+        foreach ( $products as &$product ) {
+            $var_id_map = $product['_variation_ids'] ?? array();
+            unset( $product['_variation_ids'] );
+
+            if ( empty( $product['variations'] ) ) {
+                // Simple product.
+                $sku = $product['sku'];
+                if ( $sku && isset( $var_id_map[ $sku ], $inventory_counts[ $var_id_map[ $sku ] ] ) ) {
+                    $product['stock'] = (int) $inventory_counts[ $var_id_map[ $sku ] ];
+                }
+            } else {
+                // Variable product: set stock on each variation.
+                foreach ( $product['variations'] as &$var ) {
+                    $vsku = $var['sku'];
+                    if ( $vsku && isset( $var_id_map[ $vsku ], $inventory_counts[ $var_id_map[ $vsku ] ] ) ) {
+                        $var['stock'] = (int) $inventory_counts[ $var_id_map[ $vsku ] ];
+                    }
+                }
+                unset( $var );
+            }
+        }
+        unset( $product );
+
+        WCSS_Logger::info( sprintf( 'Square: fetched %d product(s) from catalog.', count( $products ) ) );
+
+        return $products;
+    }
+
     // ------------------------------------------------------------------
     //  Internal helpers
     // ------------------------------------------------------------------
@@ -130,23 +292,19 @@ class WCSS_Square_Provider implements WCSS_Platform_Provider_Interface {
     /**
      * Search Square catalog for items matching the given SKUs.
      *
-     * Uses the Search Catalog Items endpoint which supports text/keyword search,
-     * then filters results by exact SKU match on the item variations.
-     *
      * @param array $skus
      * @return array SKU => variation_object_id
      */
     private function search_catalog_by_skus( array $skus ) {
         $mapping = array();
 
-        // Square's search endpoint handles batches, but we chunk to be safe with large catalogs.
         foreach ( array_chunk( $skus, 100 ) as $chunk ) {
             $body = array(
                 'object_types' => array( 'ITEM' ),
                 'query'        => array(
                     'exact_query' => array(
                         'attribute_name'  => 'sku',
-                        'attribute_value' => '', // placeholder — we loop per-SKU below
+                        'attribute_value' => '',
                     ),
                 ),
             );
@@ -172,7 +330,7 @@ class WCSS_Square_Provider implements WCSS_Platform_Provider_Interface {
                             : '';
                         if ( strcasecmp( $var_sku, $sku ) === 0 ) {
                             $mapping[ $sku ] = $variation['id'];
-                            break 2; // found match, move to next SKU
+                            break 2;
                         }
                     }
                 }
@@ -208,14 +366,12 @@ class WCSS_Square_Provider implements WCSS_Platform_Provider_Interface {
 
             $raw_counts = isset( $response['counts'] ) ? $response['counts'] : array();
             foreach ( $raw_counts as $count_entry ) {
-                // Only consider IN_STOCK state.
                 if ( 'IN_STOCK' !== ( $count_entry['state'] ?? '' ) ) {
                     continue;
                 }
                 $obj_id = $count_entry['catalog_object_id'];
                 $qty    = isset( $count_entry['quantity'] ) ? (int) $count_entry['quantity'] : 0;
 
-                // Sum quantities if there are multiple entries (shouldn't happen per-location, but be safe).
                 if ( isset( $counts[ $obj_id ] ) ) {
                     $counts[ $obj_id ] += $qty;
                 } else {
@@ -241,8 +397,8 @@ class WCSS_Square_Provider implements WCSS_Platform_Provider_Interface {
         $args = array(
             'method'  => $method,
             'headers' => array(
-                'Authorization' => 'Bearer ' . $this->access_token,
-                'Content-Type'  => 'application/json',
+                'Authorization'  => 'Bearer ' . $this->access_token,
+                'Content-Type'   => 'application/json',
                 'Square-Version' => '2024-12-18',
             ),
             'timeout' => 30,

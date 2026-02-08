@@ -3,10 +3,10 @@
  * Platform Provider Factory
  *
  * Creates the correct inventory-sync provider based on the vendor's configured platform.
- * Currently supports "square". Adding a new platform (e.g. Shopify) only requires:
+ * Supports "square" and "shopify". Adding a new platform only requires:
  *   1. Creating a new class that implements WCSS_Platform_Provider_Interface.
  *   2. Registering it in the $providers map below.
- *   3. Setting 'platform' => 'shopify' in vendor-config.php for the relevant vendor.
+ *   3. Setting 'platform' => 'newplatform' in vendor-config.php for the relevant vendor.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -34,6 +34,25 @@ interface WCSS_Platform_Provider_Interface {
      * @return bool True on success, false on failure.
      */
     public function adjust_inventory( $sku, $quantity );
+
+    /**
+     * Fetch all products from the external platform for import into WooCommerce.
+     *
+     * Returns a normalized array of products. Each product array contains:
+     *   'name'        => (string) Product title
+     *   'description' => (string) Product description / body HTML
+     *   'sku'         => (string) SKU (for simple products or the parent-level SKU)
+     *   'price'       => (string) Regular price
+     *   'stock'       => (int|null) Stock quantity (null if not tracked)
+     *   'images'      => (array) List of image URLs
+     *   'categories'  => (array) List of category names
+     *   'variations'  => (array) For variable products, each with: name, sku, price, stock, attributes
+     *   'weight'      => (string) Weight
+     *   'status'      => (string) 'active' or 'inactive'
+     *
+     * @return array List of normalized product arrays.
+     */
+    public function get_products();
 }
 
 class WCSS_Platform_Factory {
@@ -44,8 +63,8 @@ class WCSS_Platform_Factory {
      * @var array
      */
     private static $providers = array(
-        'square' => 'WCSS_Square_Provider',
-        // 'shopify' => 'WCSS_Shopify_Provider',  // future
+        'square'  => 'WCSS_Square_Provider',
+        'shopify' => 'WCSS_Shopify_Provider',
     );
 
     /**
@@ -66,5 +85,14 @@ class WCSS_Platform_Factory {
 
         $class = self::$providers[ $platform ];
         return new $class( $vendor_config );
+    }
+
+    /**
+     * Get the list of supported platform slugs.
+     *
+     * @return array
+     */
+    public static function get_supported_platforms() {
+        return array_keys( self::$providers );
     }
 }
