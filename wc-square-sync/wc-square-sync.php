@@ -3,7 +3,7 @@
  * Plugin Name:       WC Inventory Sync
  * Plugin URI:        https://github.com/justins921/Loveyoulocal
  * Description:       Syncs WooCommerce product inventory with Square and Shopify for Dokan multi-vendor marketplaces. External platforms are the source of truth — periodic cron pulls inventory, WooCommerce pushes decrements on purchase. Also supports importing products from Square/Shopify into WooCommerce.
- * Version:           2.0.0
+ * Version:           2.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Loveyoulocal
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'WCSS_VERSION', '2.0.0' );
+define( 'WCSS_VERSION', '2.1.0' );
 define( 'WCSS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WCSS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -48,6 +48,7 @@ function wcss_load_classes() {
         'class-sync-scheduler.php',
         'class-purchase-handler.php',
         'class-product-importer.php',
+        'class-admin-page.php',
     );
 
     foreach ( $includes as $file ) {
@@ -74,6 +75,12 @@ function wcss_init() {
     // Start the purchase hook (WooCommerce → Platform).
     $purchase_handler = new WCSS_Purchase_Handler( $vendor_config );
     $purchase_handler->init();
+
+    // Admin page (WooCommerce → Inventory Sync).
+    if ( is_admin() ) {
+        $admin_page = new WCSS_Admin_Page( $vendor_config );
+        $admin_page->init();
+    }
 
     WCSS_Logger::info( 'WC Inventory Sync plugin initialized.' );
 }
