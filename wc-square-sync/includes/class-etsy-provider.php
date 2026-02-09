@@ -30,6 +30,9 @@ class WCSS_Etsy_Provider implements WCSS_Platform_Provider_Interface {
     /** @var string OAuth 2.0 access token for write operations. */
     private $access_token;
 
+    /** @var string OAuth 2.0 refresh token for auto-refreshing expired access tokens. */
+    private $refresh_token;
+
     /** @var string Etsy Open API v3 base URL. */
     private $api_base = 'https://openapi.etsy.com/v3/application';
 
@@ -37,9 +40,10 @@ class WCSS_Etsy_Provider implements WCSS_Platform_Provider_Interface {
      * @param array $vendor_config
      */
     public function __construct( array $vendor_config ) {
-        $this->api_key      = $vendor_config['etsy_api_key'];
-        $this->shop_id      = $vendor_config['etsy_shop_id'];
-        $this->access_token = $vendor_config['etsy_access_token'];
+        $this->api_key       = $vendor_config['etsy_api_key'];
+        $this->shop_id       = $vendor_config['etsy_shop_id'];
+        $this->access_token  = $vendor_config['etsy_access_token'];
+        $this->refresh_token = isset( $vendor_config['etsy_refresh_token'] ) ? $vendor_config['etsy_refresh_token'] : '';
     }
 
     /**
@@ -489,6 +493,23 @@ class WCSS_Etsy_Provider implements WCSS_Platform_Provider_Interface {
         $code    = wp_remote_retrieve_response_code( $response );
         $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
 
+        // If unauthorized and we have a refresh token, try to refresh and retry once.
+        if ( 401 === $code && $this->refresh_token ) {
+            $refreshed = $this->refresh_access_token();
+            if ( $refreshed ) {
+                // Retry with the new access token.
+                $args['headers']['Authorization'] = 'Bearer ' . $this->access_token;
+                $response = wp_remote_request( $url, $args );
+
+                if ( is_wp_error( $response ) ) {
+                    return $response;
+                }
+
+                $code    = wp_remote_retrieve_response_code( $response );
+                $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+            }
+        }
+
         if ( $code < 200 || $code >= 300 ) {
             $error_msg = 'Unknown error';
             if ( isset( $decoded['error'] ) ) {
@@ -503,5 +524,72 @@ class WCSS_Etsy_Provider implements WCSS_Platform_Provider_Interface {
         }
 
         return is_array( $decoded ) ? $decoded : array();
+    }
+
+    /**
+     * Refresh the Etsy access token using the stored refresh token.
+     *
+     * On success, updates $this->access_token and $this->refresh_token,
+     * and persists the new tokens to the database.
+     *
+     * @return bool True if the token was refreshed successfully.
+     */
+    private function refresh_access_token() {
+        $response = wp_remote_post( 'https://api.etsy.com/v3/public/oauth/token', array(
+            'body'    => array(
+                'grant_type'    => 'refresh_token',
+                'client_id'     => $this->api_key,
+                'refresh_token' => $this->refresh_token,
+            ),
+            'timeout' => 30,
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            WCSS_Logger::warning( 'Etsy: token refresh failed: ' . $response->get_error_message() );
+            return false;
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( empty( $body['access_token'] ) ) {
+            WCSS_Logger::warning( 'Etsy: token refresh returned no access token — re-authorization may be needed.' );
+            return false;
+        }
+
+        $this->access_token = $body['access_token'];
+        if ( ! empty( $body['refresh_token'] ) ) {
+            $this->refresh_token = $body['refresh_token'];
+        }
+
+        // Persist the refreshed tokens to the database.
+        $this->persist_refreshed_tokens();
+
+        WCSS_Logger::info( 'Etsy: access token refreshed successfully.' );
+
+        return true;
+    }
+
+    /**
+     * Save the refreshed tokens back to the database.
+     *
+     * Finds the matching vendor config by api_key + shop_id and updates the tokens.
+     */
+    private function persist_refreshed_tokens() {
+        $all_configs = get_option( 'wcss_vendor_configs', array() );
+
+        foreach ( $all_configs as $vid => &$cfg ) {
+            if (
+                isset( $cfg['platform'] ) && 'etsy' === $cfg['platform'] &&
+                isset( $cfg['etsy_api_key'] ) && $cfg['etsy_api_key'] === $this->api_key &&
+                isset( $cfg['etsy_shop_id'] ) && $cfg['etsy_shop_id'] === $this->shop_id
+            ) {
+                $cfg['etsy_access_token']  = $this->access_token;
+                $cfg['etsy_refresh_token'] = $this->refresh_token;
+                break;
+            }
+        }
+        unset( $cfg );
+
+        update_option( 'wcss_vendor_configs', $all_configs );
     }
 }

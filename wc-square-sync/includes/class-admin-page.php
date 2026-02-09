@@ -38,6 +38,7 @@ class WCSS_Admin_Page {
         add_action( 'admin_post_wcss_test_connection', array( $this, 'handle_test_connection' ) );
         add_action( 'admin_post_wcss_run_sync', array( $this, 'handle_run_sync' ) );
         add_action( 'admin_post_wcss_run_import', array( $this, 'handle_run_import' ) );
+        add_action( 'admin_post_wcss_etsy_oauth_start', array( $this, 'handle_etsy_oauth_start' ) );
     }
 
     /**
@@ -58,6 +59,12 @@ class WCSS_Admin_Page {
      * Render the admin page.
      */
     public function render_page() {
+        // Handle Etsy OAuth callback before any output.
+        if ( isset( $_GET['wcss_etsy_callback'] ) && isset( $_GET['code'] ) ) {
+            $this->handle_etsy_oauth_callback();
+            return;
+        }
+
         $vendors  = $this->vendor_config->get_all_vendors_raw();
         $message  = isset( $_GET['wcss_message'] ) ? sanitize_text_field( wp_unslash( $_GET['wcss_message'] ) ) : '';
         $msg_type = isset( $_GET['wcss_type'] ) ? sanitize_text_field( wp_unslash( $_GET['wcss_type'] ) ) : 'info';
@@ -259,6 +266,17 @@ class WCSS_Admin_Page {
         $et_api_key = $db_config['etsy_api_key'] ?? '';
         $et_shop_id = $db_config['etsy_shop_id'] ?? '';
         $et_token   = $db_config['etsy_access_token'] ?? '';
+        $et_refresh = $db_config['etsy_refresh_token'] ?? '';
+
+        // Check for Etsy OAuth tokens from the authorization flow.
+        $etsy_tokens = get_transient( 'wcss_etsy_tokens' );
+        if ( $etsy_tokens && ! $is_edit ) {
+            $et_api_key = $etsy_tokens['api_key'];
+            $et_token   = $etsy_tokens['access_token'];
+            $et_refresh = $etsy_tokens['refresh_token'];
+            $platform   = 'etsy';
+            delete_transient( 'wcss_etsy_tokens' );
+        }
 
         // Get all Dokan vendors for the dropdown.
         $dokan_vendors = $this->get_dokan_vendors();
@@ -401,13 +419,32 @@ class WCSS_Admin_Page {
                         </td>
                     </tr>
                     <tr class="wcss-etsy-field">
-                        <th scope="row"><label for="wcss_et_token">Etsy Access Token</label></th>
+                        <th scope="row">Etsy Authorization</th>
                         <td>
-                            <input type="password" name="etsy_access_token" id="wcss_et_token" class="regular-text"
-                                   value="<?php echo esc_attr( $et_token ); ?>"
-                                   autocomplete="off">
-                            <button type="button" class="button button-small" onclick="wcssTogglePassword('wcss_et_token')">Show</button>
-                            <p class="description">OAuth 2.0 access token. Required for inventory updates. See Etsy API docs for the OAuth flow.</p>
+                            <?php if ( $et_token ) : ?>
+                                <span style="color:#46b450; font-weight:bold;">&#10003; Connected</span>
+                                <input type="hidden" name="etsy_access_token" value="<?php echo esc_attr( $et_token ); ?>">
+                                <input type="hidden" name="etsy_refresh_token" value="<?php echo esc_attr( $et_refresh ); ?>">
+                                <p class="description">Etsy account is authorized. To re-authorize, click the button below.</p>
+                            <?php else : ?>
+                                <input type="hidden" name="etsy_access_token" id="wcss_et_token" value="">
+                                <input type="hidden" name="etsy_refresh_token" id="wcss_et_refresh" value="">
+                                <span style="color:#dc3232;">Not connected</span>
+                            <?php endif; ?>
+                            <div style="margin-top: 8px;">
+                                <button type="button" class="button button-secondary" onclick="wcssStartEtsyOAuth()">
+                                    <?php echo $et_token ? 'Re-authorize with Etsy' : 'Authorize with Etsy'; ?>
+                                </button>
+                            </div>
+                            <div style="margin-top: 10px; padding: 10px 12px; background: #f0f0f1; border-left: 4px solid #2271b1; font-size: 13px;">
+                                <strong>Setup Instructions:</strong><br>
+                                1. Go to <a href="https://www.etsy.com/developers/your-apps" target="_blank">Etsy Developer Portal</a> and create an app (or open your existing app).<br>
+                                2. Set the <strong>Callback URL</strong> to:<br>
+                                <code style="display:inline-block; margin:4px 0; padding:2px 6px; background:#fff; user-select:all;"><?php echo esc_html( admin_url( 'admin.php?page=wc-inventory-sync&wcss_etsy_callback=1' ) ); ?></code><br>
+                                3. Copy the <strong>Keystring</strong> into the "Etsy API Key" field above.<br>
+                                4. Enter your <strong>Shop ID</strong> above.<br>
+                                5. Click <strong>"Authorize with Etsy"</strong> — you'll be redirected to Etsy to approve.
+                            </div>
                         </td>
                     </tr>
 
@@ -477,6 +514,30 @@ class WCSS_Admin_Page {
         function wcssTogglePassword(id) {
             var input = document.getElementById(id);
             input.type = input.type === 'password' ? 'text' : 'password';
+        }
+        function wcssStartEtsyOAuth() {
+            var apiKey = document.getElementById('wcss_et_api_key').value;
+            if (!apiKey) {
+                alert('Please enter your Etsy API Key first.');
+                return;
+            }
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?php echo esc_url( admin_url( "admin-post.php" ) ); ?>';
+            var fields = {
+                '_wpnonce': '<?php echo esc_js( wp_create_nonce( "wcss_etsy_oauth_start" ) ); ?>',
+                'action': 'wcss_etsy_oauth_start',
+                'etsy_api_key': apiKey
+            };
+            for (var name in fields) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = fields[name];
+                form.appendChild(input);
+            }
+            document.body.appendChild(form);
+            form.submit();
         }
         // Initialize visibility on page load.
         wcssTogglePlatform('<?php echo esc_js( $platform ); ?>');
@@ -561,9 +622,10 @@ class WCSS_Admin_Page {
             $config['shopify_access_token'] = sanitize_text_field( wp_unslash( $_POST['shopify_access_token'] ?? '' ) );
             $config['shopify_location_id']  = sanitize_text_field( wp_unslash( $_POST['shopify_location_id'] ?? '' ) );
         } elseif ( 'etsy' === $platform ) {
-            $config['etsy_api_key']      = sanitize_text_field( wp_unslash( $_POST['etsy_api_key'] ?? '' ) );
-            $config['etsy_shop_id']      = sanitize_text_field( wp_unslash( $_POST['etsy_shop_id'] ?? '' ) );
-            $config['etsy_access_token'] = sanitize_text_field( wp_unslash( $_POST['etsy_access_token'] ?? '' ) );
+            $config['etsy_api_key']       = sanitize_text_field( wp_unslash( $_POST['etsy_api_key'] ?? '' ) );
+            $config['etsy_shop_id']       = sanitize_text_field( wp_unslash( $_POST['etsy_shop_id'] ?? '' ) );
+            $config['etsy_access_token']  = sanitize_text_field( wp_unslash( $_POST['etsy_access_token'] ?? '' ) );
+            $config['etsy_refresh_token'] = sanitize_text_field( wp_unslash( $_POST['etsy_refresh_token'] ?? '' ) );
         }
 
         // Validate required fields.
@@ -718,6 +780,124 @@ class WCSS_Admin_Page {
             ),
             $summary['errors'] > 0 ? 'warning' : 'success'
         );
+    }
+
+    // ------------------------------------------------------------------
+    //  Etsy OAuth
+    // ------------------------------------------------------------------
+
+    /**
+     * Initiate the Etsy OAuth 2.0 PKCE flow.
+     * Generates PKCE codes, stores them in a transient, and redirects to Etsy.
+     */
+    public function handle_etsy_oauth_start() {
+        check_admin_referer( 'wcss_etsy_oauth_start' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( 'Unauthorized.' );
+        }
+
+        $api_key = sanitize_text_field( wp_unslash( $_POST['etsy_api_key'] ?? '' ) );
+        if ( empty( $api_key ) ) {
+            $this->redirect_with_message( 'Please enter your Etsy API Key first.', 'error' );
+            return;
+        }
+
+        // Generate PKCE code_verifier and code_challenge (RFC 7636).
+        $verifier_bytes = random_bytes( 32 );
+        $code_verifier  = rtrim( strtr( base64_encode( $verifier_bytes ), '+/', '-_' ), '=' );
+        $challenge_hash = hash( 'sha256', $code_verifier, true );
+        $code_challenge = rtrim( strtr( base64_encode( $challenge_hash ), '+/', '-_' ), '=' );
+        $state          = wp_generate_password( 32, false, false );
+
+        // Store OAuth state in a transient (10 minutes).
+        set_transient( 'wcss_etsy_oauth', array(
+            'code_verifier' => $code_verifier,
+            'state'         => $state,
+            'api_key'       => $api_key,
+        ), 600 );
+
+        $callback_url = admin_url( 'admin.php?page=wc-inventory-sync&wcss_etsy_callback=1' );
+
+        $auth_url = add_query_arg( array(
+            'response_type'         => 'code',
+            'redirect_uri'          => $callback_url,
+            'scope'                 => 'listings_r listings_w',
+            'client_id'             => $api_key,
+            'state'                 => $state,
+            'code_challenge'        => $code_challenge,
+            'code_challenge_method' => 'S256',
+        ), 'https://www.etsy.com/oauth/connect' );
+
+        // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+        wp_redirect( $auth_url );
+        exit;
+    }
+
+    /**
+     * Handle the Etsy OAuth 2.0 callback.
+     * Exchanges the authorization code for access + refresh tokens.
+     */
+    private function handle_etsy_oauth_callback() {
+        $code  = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : '';
+        $state = isset( $_GET['state'] ) ? sanitize_text_field( wp_unslash( $_GET['state'] ) ) : '';
+
+        $oauth_data = get_transient( 'wcss_etsy_oauth' );
+
+        if ( ! $oauth_data || ! hash_equals( $oauth_data['state'], $state ) ) {
+            $this->redirect_with_message( 'Etsy authorization failed — invalid or expired state. Please try again.', 'error' );
+            return;
+        }
+
+        $callback_url = admin_url( 'admin.php?page=wc-inventory-sync&wcss_etsy_callback=1' );
+
+        // Exchange authorization code for tokens.
+        $response = wp_remote_post( 'https://api.etsy.com/v3/public/oauth/token', array(
+            'body'    => array(
+                'grant_type'    => 'authorization_code',
+                'client_id'     => $oauth_data['api_key'],
+                'redirect_uri'  => $callback_url,
+                'code'          => $code,
+                'code_verifier' => $oauth_data['code_verifier'],
+            ),
+            'timeout' => 30,
+        ) );
+
+        delete_transient( 'wcss_etsy_oauth' );
+
+        if ( is_wp_error( $response ) ) {
+            $this->redirect_with_message(
+                'Etsy token exchange failed: ' . esc_html( $response->get_error_message() ),
+                'error'
+            );
+            return;
+        }
+
+        $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+        $status = wp_remote_retrieve_response_code( $response );
+
+        if ( $status < 200 || $status >= 300 || empty( $body['access_token'] ) ) {
+            $error = isset( $body['error_description'] )
+                ? $body['error_description']
+                : ( isset( $body['error'] ) ? $body['error'] : 'Unknown error (HTTP ' . $status . ')' );
+            $this->redirect_with_message( 'Etsy authorization failed: ' . esc_html( $error ), 'error' );
+            return;
+        }
+
+        // Store tokens in a transient for the form to pick up.
+        set_transient( 'wcss_etsy_tokens', array(
+            'api_key'       => $oauth_data['api_key'],
+            'access_token'  => $body['access_token'],
+            'refresh_token' => isset( $body['refresh_token'] ) ? $body['refresh_token'] : '',
+        ), 3600 );
+
+        wp_safe_redirect( add_query_arg( array(
+            'page'         => 'wc-inventory-sync',
+            'tab'          => 'add-vendor',
+            'wcss_message' => urlencode( 'Etsy authorized successfully! Your access token has been filled in. Complete the form and click "Add Vendor" to save.' ),
+            'wcss_type'    => 'success',
+        ), admin_url( 'admin.php' ) ) );
+        exit;
     }
 
     // ------------------------------------------------------------------
