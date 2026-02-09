@@ -2,7 +2,8 @@
 /**
  * Vendor Configuration Registry
  *
- * Loads the vendor list from vendor-config.php and provides lookup methods.
+ * Loads vendor configurations from the WordPress database (wp_options).
+ * Falls back to vendor-config.php for backward compatibility.
  * Validates platform-specific required fields (Square vs Shopify).
  */
 
@@ -18,6 +19,9 @@ class WCSS_Vendor_Config {
     /** @var int Default sync interval in seconds (6 hours). */
     const DEFAULT_SYNC_INTERVAL = 21600;
 
+    /** @var string WordPress option key for storing vendor configs. */
+    const DB_OPTION_KEY = 'wcss_vendor_configs';
+
     /**
      * Required fields per platform.
      *
@@ -29,17 +33,29 @@ class WCSS_Vendor_Config {
     );
 
     /**
-     * Load vendor configurations from the config file.
+     * Load vendor configurations from the database, with file fallback.
      */
     public function __construct() {
-        $config_file = WCSS_PLUGIN_DIR . 'vendor-config.php';
+        // Primary: load from database.
+        $db_configs = get_option( self::DB_OPTION_KEY, array() );
 
+        if ( ! empty( $db_configs ) && is_array( $db_configs ) ) {
+            foreach ( $db_configs as $vendor_id => $config ) {
+                if ( $this->validate_config( $vendor_id, $config ) ) {
+                    $this->vendors[ (int) $vendor_id ] = $this->normalize_config( $config );
+                }
+            }
+        }
+
+        // Fallback: merge in vendor-config.php entries (file entries won't overwrite DB entries).
+        $config_file = WCSS_PLUGIN_DIR . 'vendor-config.php';
         if ( file_exists( $config_file ) ) {
-            $raw = include $config_file;
-            if ( is_array( $raw ) ) {
-                foreach ( $raw as $vendor_id => $config ) {
-                    if ( $this->validate_config( $vendor_id, $config ) ) {
-                        $this->vendors[ (int) $vendor_id ] = $this->normalize_config( $config );
+            $file_configs = include $config_file;
+            if ( is_array( $file_configs ) ) {
+                foreach ( $file_configs as $vendor_id => $config ) {
+                    $vendor_id = (int) $vendor_id;
+                    if ( ! isset( $this->vendors[ $vendor_id ] ) && $this->validate_config( $vendor_id, $config ) ) {
+                        $this->vendors[ $vendor_id ] = $this->normalize_config( $config );
                     }
                 }
             }
@@ -80,13 +96,61 @@ class WCSS_Vendor_Config {
     }
 
     /**
+     * Get ALL vendor configurations including disabled ones.
+     *
+     * @return array Vendor configs keyed by vendor ID.
+     */
+    public function get_all_vendors_raw() {
+        return $this->vendors;
+    }
+
+    /**
+     * Save a vendor configuration to the database.
+     *
+     * @param int   $vendor_id
+     * @param array $config
+     * @return bool
+     */
+    public static function save_vendor( $vendor_id, array $config ) {
+        $vendor_id  = (int) $vendor_id;
+        $all        = get_option( self::DB_OPTION_KEY, array() );
+        $all[ $vendor_id ] = $config;
+        return update_option( self::DB_OPTION_KEY, $all );
+    }
+
+    /**
+     * Remove a vendor configuration from the database.
+     *
+     * @param int $vendor_id
+     * @return bool
+     */
+    public static function delete_vendor( $vendor_id ) {
+        $vendor_id = (int) $vendor_id;
+        $all       = get_option( self::DB_OPTION_KEY, array() );
+        unset( $all[ $vendor_id ] );
+        return update_option( self::DB_OPTION_KEY, $all );
+    }
+
+    /**
+     * Get the required fields for a given platform.
+     *
+     * @param string $platform
+     * @return array
+     */
+    public static function get_required_fields( $platform ) {
+        return isset( self::$platform_required_fields[ $platform ] )
+            ? self::$platform_required_fields[ $platform ]
+            : array();
+    }
+
+    /**
      * Validate that a vendor config has required fields for its platform.
      *
      * @param int   $vendor_id
      * @param mixed $config
      * @return bool
      */
-    private function validate_config( $vendor_id, $config ) {
+    public function validate_config( $vendor_id, $config ) {
         if ( ! is_array( $config ) ) {
             return false;
         }
