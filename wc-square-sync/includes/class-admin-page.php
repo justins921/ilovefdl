@@ -8,7 +8,7 @@
  *   - Selecting Dokan vendors from a dropdown (no need to find IDs)
  *   - Testing API connections
  *   - Triggering manual inventory syncs
- *   - Importing products from Square/Shopify
+ *   - Importing products from Square/Shopify/Etsy
  *   - Viewing recent log entries
  */
 
@@ -157,7 +157,15 @@ class WCSS_Admin_Page {
                             <br><small style="color:#666;">ID: <?php echo esc_html( $vendor_id ); ?></small>
                         </td>
                         <td>
-                            <span class="dashicons dashicons-<?php echo 'shopify' === $config['platform'] ? 'cart' : 'store'; ?>"
+                            <?php
+                            $platform_icon = 'store';
+                            if ( 'shopify' === $config['platform'] ) {
+                                $platform_icon = 'cart';
+                            } elseif ( 'etsy' === $config['platform'] ) {
+                                $platform_icon = 'tag';
+                            }
+                            ?>
+                            <span class="dashicons dashicons-<?php echo esc_attr( $platform_icon ); ?>"
                                   style="vertical-align: middle;"></span>
                             <?php echo esc_html( ucfirst( $config['platform'] ) ); ?>
                         </td>
@@ -247,6 +255,11 @@ class WCSS_Admin_Page {
         $sh_token    = $db_config['shopify_access_token'] ?? '';
         $sh_location = $db_config['shopify_location_id'] ?? '';
 
+        // Etsy fields.
+        $et_api_key = $db_config['etsy_api_key'] ?? '';
+        $et_shop_id = $db_config['etsy_shop_id'] ?? '';
+        $et_token   = $db_config['etsy_access_token'] ?? '';
+
         // Get all Dokan vendors for the dropdown.
         $dokan_vendors = $this->get_dokan_vendors();
         ?>
@@ -310,6 +323,7 @@ class WCSS_Admin_Page {
                             <select name="platform" id="wcss_platform" onchange="wcssTogglePlatform(this.value)">
                                 <option value="square" <?php selected( $platform, 'square' ); ?>>Square</option>
                                 <option value="shopify" <?php selected( $platform, 'shopify' ); ?>>Shopify</option>
+                                <option value="etsy" <?php selected( $platform, 'etsy' ); ?>>Etsy</option>
                             </select>
                         </td>
                     </tr>
@@ -360,6 +374,40 @@ class WCSS_Admin_Page {
                             <input type="text" name="shopify_location_id" id="wcss_sh_location" class="regular-text"
                                    value="<?php echo esc_attr( $sh_location ); ?>"
                                    placeholder="e.g., 12345678901">
+                        </td>
+                    </tr>
+
+                    <!-- Etsy Fields -->
+                    <tr class="wcss-etsy-field">
+                        <th scope="row"><label for="wcss_et_api_key">Etsy API Key</label></th>
+                        <td>
+                            <input type="password" name="etsy_api_key" id="wcss_et_api_key" class="regular-text"
+                                   value="<?php echo esc_attr( $et_api_key ); ?>"
+                                   autocomplete="off">
+                            <button type="button" class="button button-small" onclick="wcssTogglePassword('wcss_et_api_key')">Show</button>
+                            <p class="description">From <a href="https://www.etsy.com/developers/your-apps" target="_blank">Etsy Developer Portal</a> → Your App → Keystring.</p>
+                        </td>
+                    </tr>
+                    <tr class="wcss-etsy-field">
+                        <th scope="row"><label for="wcss_et_shop_id">Etsy Shop ID</label></th>
+                        <td>
+                            <input type="text" name="etsy_shop_id" id="wcss_et_shop_id" class="regular-text"
+                                   value="<?php echo esc_attr( $et_shop_id ); ?>"
+                                   placeholder="e.g., 12345678">
+                            <p class="description">
+                                Numeric shop ID. Find it in your Etsy shop URL or via the
+                                <a href="https://developers.etsy.com/documentation/essentials/authentication#requesting-an-oauth-token" target="_blank">Etsy API</a>.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wcss-etsy-field">
+                        <th scope="row"><label for="wcss_et_token">Etsy Access Token</label></th>
+                        <td>
+                            <input type="password" name="etsy_access_token" id="wcss_et_token" class="regular-text"
+                                   value="<?php echo esc_attr( $et_token ); ?>"
+                                   autocomplete="off">
+                            <button type="button" class="button button-small" onclick="wcssTogglePassword('wcss_et_token')">Show</button>
+                            <p class="description">OAuth 2.0 access token. Required for inventory updates. See Etsy API docs for the OAuth flow.</p>
                         </td>
                     </tr>
 
@@ -421,8 +469,10 @@ class WCSS_Admin_Page {
         function wcssTogglePlatform(platform) {
             var squareRows  = document.querySelectorAll('.wcss-square-field');
             var shopifyRows = document.querySelectorAll('.wcss-shopify-field');
+            var etsyRows    = document.querySelectorAll('.wcss-etsy-field');
             squareRows.forEach(function(row)  { row.style.display = platform === 'square'  ? '' : 'none'; });
             shopifyRows.forEach(function(row) { row.style.display = platform === 'shopify' ? '' : 'none'; });
+            etsyRows.forEach(function(row)    { row.style.display = platform === 'etsy'    ? '' : 'none'; });
         }
         function wcssTogglePassword(id) {
             var input = document.getElementById(id);
@@ -510,13 +560,17 @@ class WCSS_Admin_Page {
             $config['shopify_shop_domain']  = sanitize_text_field( wp_unslash( $_POST['shopify_shop_domain'] ?? '' ) );
             $config['shopify_access_token'] = sanitize_text_field( wp_unslash( $_POST['shopify_access_token'] ?? '' ) );
             $config['shopify_location_id']  = sanitize_text_field( wp_unslash( $_POST['shopify_location_id'] ?? '' ) );
+        } elseif ( 'etsy' === $platform ) {
+            $config['etsy_api_key']      = sanitize_text_field( wp_unslash( $_POST['etsy_api_key'] ?? '' ) );
+            $config['etsy_shop_id']      = sanitize_text_field( wp_unslash( $_POST['etsy_shop_id'] ?? '' ) );
+            $config['etsy_access_token'] = sanitize_text_field( wp_unslash( $_POST['etsy_access_token'] ?? '' ) );
         }
 
         // Validate required fields.
         $required = WCSS_Vendor_Config::get_required_fields( $platform );
         foreach ( $required as $field ) {
             if ( empty( $config[ $field ] ) ) {
-                $label = str_replace( '_', ' ', str_replace( array( 'square_', 'shopify_' ), '', $field ) );
+                $label = str_replace( '_', ' ', str_replace( array( 'square_', 'shopify_', 'etsy_' ), '', $field ) );
                 $this->redirect_with_message(
                     sprintf( 'Missing required field: <strong>%s</strong>', esc_html( ucwords( $label ) ) ),
                     'error'

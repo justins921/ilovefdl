@@ -30,6 +30,7 @@ class WCSS_Vendor_Config {
     private static $platform_required_fields = array(
         'square'  => array( 'square_access_token', 'square_location_id' ),
         'shopify' => array( 'shopify_shop_domain', 'shopify_access_token', 'shopify_location_id' ),
+        'etsy'    => array( 'etsy_api_key', 'etsy_shop_id', 'etsy_access_token' ),
     );
 
     /**

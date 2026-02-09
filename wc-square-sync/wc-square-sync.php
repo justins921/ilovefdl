@@ -45,6 +45,7 @@ function wcss_load_classes() {
         'class-platform-factory.php',
         'class-square-provider.php',
         'class-shopify-provider.php',
+        'class-etsy-provider.php',
         'class-sync-scheduler.php',
         'class-purchase-handler.php',
         'class-product-importer.php',

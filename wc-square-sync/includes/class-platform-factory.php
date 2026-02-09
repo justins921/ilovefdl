@@ -65,6 +65,7 @@ class WCSS_Platform_Factory {
     private static $providers = array(
         'square'  => 'WCSS_Square_Provider',
         'shopify' => 'WCSS_Shopify_Provider',
+        'etsy'    => 'WCSS_Etsy_Provider',
     );
 
     /**
