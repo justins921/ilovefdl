@@ -1,0 +1,294 @@
+import { Router, Request, Response } from 'express';
+import { createCheckoutSchema } from '@ilovefdl/shared';
+import prisma from '../utils/prisma';
+import stripe from '../utils/stripe';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { calculateCommission } from '../utils/commission';
+import Stripe from 'stripe';
+
+const router = Router();
+
+/**
+ * POST /checkout/session
+ * Create Stripe Checkout session with application_fee_amount
+ */
+router.post('/checkout/session', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parsed = createCheckoutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+
+    const { items, vendorId, shippingAddress, notes } = parsed.data;
+
+    // Get vendor with stripe account
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+
+    if (!vendor) {
+      res.status(404).json({ error: 'Vendor not found' });
+      return;
+    }
+
+    if (vendor.status !== 'APPROVED') {
+      res.status(400).json({ error: 'Vendor is not approved for sales' });
+      return;
+    }
+
+    if (!vendor.stripeAccountId || !vendor.stripeOnboarded) {
+      res.status(400).json({ error: 'Vendor has not completed Stripe setup' });
+      return;
+    }
+
+    // Fetch products and validate
+    const productIds = items.map((item) => item.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true, vendorId },
+    });
+
+    if (products.length !== items.length) {
+      res.status(400).json({ error: 'One or more products are unavailable' });
+      return;
+    }
+
+    // Build line items for Stripe and calculate commission
+    const commissionItems = items.map((item) => {
+      const product = products.find((p) => p.id === item.productId)!;
+      return { price: product.price, quantity: item.quantity };
+    });
+
+    const { commissionBaseAmount, commissionAmount, vendorNetAmount } =
+      calculateCommission(commissionItems, vendor.commissionRate);
+
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item) => {
+      const product = products.find((p) => p.id === item.productId)!;
+      return {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: product.name,
+            images: product.images.length > 0 ? [product.images[0]] : undefined,
+          },
+          unit_amount: Math.round(product.price * 100),
+        },
+        quantity: item.quantity,
+      };
+    });
+
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
+    // Create Stripe Checkout session
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: lineItems,
+      payment_intent_data: {
+        application_fee_amount: Math.round(commissionAmount * 100),
+        transfer_data: {
+          destination: vendor.stripeAccountId,
+        },
+      },
+      success_url: `${appUrl}/orders/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/orders/cancel`,
+      customer_email: req.user!.email,
+      metadata: {
+        userId: req.user!.id,
+        vendorId: vendor.id,
+        notes: notes || '',
+      },
+    });
+
+    // Create order in pending state
+    const order = await prisma.order.create({
+      data: {
+        userId: req.user!.id,
+        vendorId: vendor.id,
+        status: 'PENDING',
+        subtotal: commissionBaseAmount,
+        total: commissionBaseAmount,
+        commissionBaseAmount,
+        commissionRate: vendor.commissionRate,
+        commissionAmount,
+        vendorNetAmount,
+        stripeSessionId: session.id,
+        shippingAddress: shippingAddress || undefined,
+        notes,
+        items: {
+          create: items.map((item) => {
+            const product = products.find((p) => p.id === item.productId)!;
+            return {
+              productId: product.id,
+              quantity: item.quantity,
+              unitPrice: product.price,
+              total: product.price * item.quantity,
+            };
+          }),
+        },
+      },
+      include: { items: true },
+    });
+
+    res.json({
+      data: {
+        sessionId: session.id,
+        sessionUrl: session.url,
+        orderId: order.id,
+      },
+    });
+  } catch (error) {
+    console.error('Checkout error:', error);
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+/**
+ * GET /orders
+ * Get user's orders (auth) or all orders (admin)
+ */
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const where = req.user!.role === 'ADMIN' ? {} : { userId: req.user!.id };
+
+    const orders = await prisma.order.findMany({
+      where,
+      include: {
+        items: {
+          include: {
+            product: {
+              select: { id: true, name: true, slug: true, images: true },
+            },
+          },
+        },
+        vendor: {
+          select: { id: true, businessName: true, slug: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ data: orders });
+  } catch (error) {
+    console.error('List orders error:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+/**
+ * GET /orders/:id
+ * Get order details
+ */
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: { id: true, name: true, slug: true, images: true, price: true },
+            },
+          },
+        },
+        vendor: {
+          select: { id: true, businessName: true, slug: true, logoUrl: true },
+        },
+        user: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+
+    // Only order owner or admin can view
+    if (order.userId !== req.user!.id && req.user!.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+
+    res.json({ data: order });
+  } catch (error) {
+    console.error('Get order error:', error);
+    res.status(500).json({ error: 'Failed to fetch order' });
+  }
+});
+
+/**
+ * POST /webhooks/stripe
+ * Handle Stripe webhooks
+ * Note: This route uses raw body parsing configured in the main app
+ */
+router.post('/webhooks/stripe', async (req: Request, res: Response) => {
+  const sig = req.headers['stripe-signature'] as string;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('STRIPE_WEBHOOK_SECRET not configured');
+    res.status(500).json({ error: 'Webhook not configured' });
+    return;
+  }
+
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err);
+    res.status(400).json({ error: 'Invalid webhook signature' });
+    return;
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        await prisma.order.update({
+          where: { stripeSessionId: session.id },
+          data: {
+            status: 'PAID',
+            stripePaymentIntent: session.payment_intent as string,
+          },
+        });
+        break;
+      }
+
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+
+        await prisma.order.updateMany({
+          where: { stripePaymentIntent: paymentIntent.id },
+          data: { status: 'PAID' },
+        });
+        break;
+      }
+
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId = charge.payment_intent as string;
+
+        if (paymentIntentId) {
+          await prisma.order.updateMany({
+            where: { stripePaymentIntent: paymentIntentId },
+            data: { status: 'REFUNDED' },
+          });
+        }
+        break;
+      }
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+export default router;

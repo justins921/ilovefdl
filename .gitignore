@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+.expo/
+*.env
+*.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.DS_Store
+*.log
+coverage/
+.turbo/
+postgres-data/
+uploads/

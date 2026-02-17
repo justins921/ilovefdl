@@ -1,0 +1,320 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  VENDOR
+  EDITOR
+  USER
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  REFUNDED
+  CANCELLED
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+}
+
+enum PostCategory {
+  THE_FONDY_FRONTLINE
+  FACES_OF_OUR_FUTURE
+  FINDING_BALANCE
+  PLAY_EXPLORE_REPEAT
+  HOMEGROWN_HEROS
+  THE_CREATIVE_CORNER
+  WEEKLY_SAVINGS
+  UNCATEGORIZED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum ExternalPlatform {
+  NATIVE
+  SHOPIFY
+  SQUARE
+  ETSY
+}
+
+// ─── USER ────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(USER)
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor                 Vendor?
+  orders                 Order[]
+  blogPosts              BlogPost[]
+  pushTokens             PushToken[]
+  notificationPreference NotificationPreference?
+  magicLinks             MagicLink[]
+
+  @@map("users")
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@map("magic_links")
+}
+
+// ─── VENDOR ──────────────────────────────────────────────
+
+model Vendor {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName      String
+  slug              String       @unique
+  description       String?
+  logoUrl           String?
+  bannerUrl         String?
+  address           String?
+  phone             String?
+  website           String?
+  socialLinks       Json?
+  status            VendorStatus @default(PENDING)
+  stripeAccountId   String?
+  stripeOnboarded   Boolean      @default(false)
+  commissionRate    Float        @default(0.05)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  products          Product[]
+  orders            Order[]
+  vendorConnections VendorConnection[]
+
+  @@map("vendors")
+}
+
+// Phase 2: External platform connections for catalog sync
+model VendorConnection {
+  id               String           @id @default(cuid())
+  vendorId         String
+  vendor           Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  platform         ExternalPlatform
+  accessToken      String?
+  refreshToken     String?
+  shopDomain       String?
+  externalShopId   String?
+  lastSyncAt       DateTime?
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([vendorId, platform])
+  @@map("vendor_connections")
+}
+
+// ─── PRODUCT ─────────────────────────────────────────────
+
+model Product {
+  id               String           @id @default(cuid())
+  vendorId         String
+  vendor           Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String           @unique
+  description      String?
+  price            Float
+  compareAtPrice   Float?
+  images           String[]
+  categoryTags     String[]
+  inventory        Int              @default(0)
+  isActive         Boolean          @default(true)
+  externalPlatform ExternalPlatform @default(NATIVE)
+  externalId       String?
+  metadata         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+  @@index([externalPlatform, externalId])
+  @@map("products")
+}
+
+// ─── ORDER ───────────────────────────────────────────────
+
+model Order {
+  id                   String      @id @default(cuid())
+  userId               String
+  user                 User        @relation(fields: [userId], references: [id])
+  vendorId             String
+  vendor               Vendor      @relation(fields: [vendorId], references: [id])
+  status               OrderStatus @default(PENDING)
+
+  subtotal             Float
+  tax                  Float       @default(0)
+  shipping             Float       @default(0)
+  total                Float
+
+  commissionBaseAmount Float
+  commissionRate       Float       @default(0.05)
+  commissionAmount     Float
+  vendorNetAmount      Float
+  processorFeeAmount   Float       @default(0)
+
+  stripeSessionId      String?     @unique
+  stripePaymentIntent  String?     @unique
+
+  shippingAddress      Json?
+  notes                String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([vendorId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  total     Float
+
+  @@map("order_items")
+}
+
+// ─── BLOG ────────────────────────────────────────────────
+
+model BlogPost {
+  id            String       @id @default(cuid())
+  authorId      String
+  author        User         @relation(fields: [authorId], references: [id])
+  title         String
+  slug          String       @unique
+  content       String
+  excerpt       String?
+  featuredImage String?
+  category      PostCategory @default(UNCATEGORIZED)
+  tags          String[]
+  status        PostStatus   @default(DRAFT)
+  publishedAt   DateTime?
+  scheduledAt   DateTime?
+  seoTitle      String?
+  seoDescription String?
+  wpOriginalId  Int?         @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@map("blog_posts")
+}
+
+// ─── BAR DIRECTORY ───────────────────────────────────────
+
+model Bar {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  address     String
+  mapLink     String?
+  phone       String?
+  website     String?
+  hours       Json?
+  photos      String[]
+  socialLinks Json?
+  ownerId     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  specials Special[]
+
+  @@map("bars")
+}
+
+model Special {
+  id          String    @id @default(cuid())
+  barId       String
+  bar         Bar       @relation(fields: [barId], references: [id], onDelete: Cascade)
+  dayOfWeek   DayOfWeek
+  title       String
+  description String?
+  price       String?
+  startTime   String?
+  endTime     String?
+  isFeatured  Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([barId, dayOfWeek])
+  @@map("specials")
+}
+
+// ─── PUSH NOTIFICATIONS ─────────────────────────────────
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+
+  @@map("push_tokens")
+}
+
+model NotificationPreference {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  breakingNews   Boolean @default(true)
+  dailySpecials  Boolean @default(true)
+  orderUpdates   Boolean @default(true)
+  categoryAlerts Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("notification_preferences")
+}

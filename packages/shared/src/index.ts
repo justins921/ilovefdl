@@ -1,0 +1,59 @@
+// ─── Types and Enums ────────────────────────────────────
+export {
+  // Enums
+  Role,
+  VendorStatus,
+  OrderStatus,
+  PostStatus,
+  PostCategory,
+  DayOfWeek,
+  ExternalPlatform,
+} from './types';
+
+export type {
+  // Core model interfaces
+  User,
+  Vendor,
+  VendorConnection,
+  Product,
+  Order,
+  OrderItem,
+  BlogPost,
+  Bar,
+  Special,
+  PushToken,
+  NotificationPreference,
+
+  // Supporting types
+  ShippingAddress,
+  BarHours,
+  CommissionBreakdown,
+
+  // API response types
+  ApiResponse,
+  ApiErrorResponse,
+  PaginatedResponse,
+  PaginationParams,
+
+  // Auth types
+  AuthTokens,
+  AuthUser,
+  MagicLinkResponse,
+
+  // Checkout types
+  CheckoutLineItem,
+  CheckoutSession,
+} from './types';
+
+// ─── Validation Schemas ─────────────────────────────────
+export * from './schemas/auth';
+export * from './schemas/vendor';
+export * from './schemas/product';
+export * from './schemas/order';
+export * from './schemas/blog';
+export * from './schemas/bar';
+export * from './schemas/special';
+export * from './schemas/notification';
+
+// ─── API Client ─────────────────────────────────────────
+export { ApiClient, ApiError } from './api-client';
