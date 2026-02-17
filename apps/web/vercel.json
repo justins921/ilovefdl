@@ -1,0 +1,37 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && npm install && npx prisma generate --schema=apps/api/prisma/schema.prisma && npm run build:web",
+  "outputDirectory": ".next",
+  "installCommand": "cd ../.. && npm install",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@api-url"
+  },
+  "regions": ["cle1"],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/shop",
+      "destination": "/marketplace",
+      "permanent": true
+    },
+    {
+      "source": "/blog/:slug*",
+      "destination": "/news/:slug*",
+      "permanent": true
+    },
+    {
+      "source": "/listing/:slug*",
+      "destination": "/bars/:slug*",
+      "permanent": true
+    }
+  ]
+}
