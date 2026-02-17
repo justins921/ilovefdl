@@ -2,21 +2,25 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy root package files
-COPY package.json ./
+# Copy root workspace config + package files
+COPY package.json package-lock.json* ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install dependencies
+# Install all workspace dependencies
 RUN npm install --workspace=apps/api --workspace=packages/shared --include-workspace-root
 
 # Copy source code
+COPY tsconfig.base.json ./
 COPY packages/shared/ ./packages/shared/
 COPY apps/api/ ./apps/api/
 
-# Generate Prisma client
+# Generate Prisma client & build TypeScript
 RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+RUN npm run build --workspace=packages/shared
+RUN npm run build --workspace=apps/api
 
-# Run migrations and start
+# Production
+ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && npm run dev --workspace=apps/api"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/index.js"]
