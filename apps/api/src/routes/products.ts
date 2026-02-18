@@ -4,6 +4,12 @@ import prisma from '../utils/prisma';
 import { requireAuth } from '../middleware/auth';
 import { Prisma } from '@prisma/client';
 
+function toJsonOrDbNull(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined {
+  if (value === null) return Prisma.JsonNull;
+  if (value === undefined) return undefined;
+  return value as Prisma.InputJsonValue;
+}
+
 const router = Router();
 
 /**
@@ -129,12 +135,14 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
+    const { metadata, ...rest } = parsed.data;
     const product = await prisma.product.create({
       data: {
-        ...parsed.data,
+        ...rest,
         vendorId: vendor!.id,
-        images: parsed.data.images || [],
-        categoryTags: parsed.data.categoryTags || [],
+        images: rest.images || [],
+        categoryTags: rest.categoryTags || [],
+        metadata: toJsonOrDbNull(metadata),
       },
     });
 
@@ -184,9 +192,13 @@ router.put('/:id', requireAuth, async (req: Request, res: Response) => {
       }
     }
 
+    const { metadata: updateMetadata, ...updateRest } = parsed.data;
     const updated = await prisma.product.update({
       where: { id: req.params.id },
-      data: parsed.data,
+      data: {
+        ...updateRest,
+        ...(updateMetadata !== undefined && { metadata: toJsonOrDbNull(updateMetadata) }),
+      },
     });
 
     res.json({ data: updated });
