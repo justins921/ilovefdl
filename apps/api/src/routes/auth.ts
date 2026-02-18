@@ -1,125 +1,142 @@
 import { Router, Request, Response } from 'express';
-import crypto from 'crypto';
-import { magicLinkSchema, verifyMagicLinkSchema } from '@ilovefdl/shared';
+import bcrypt from 'bcryptjs';
+import { loginSchema, registerSchema } from '@ilovefdl/shared';
 import prisma from '../utils/prisma';
-import { sendMagicLinkEmail } from '../utils/email';
-import { signToken } from '../middleware/auth';
+import { signToken, requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 /**
- * POST /auth/magic-link
- * Send a magic link email to the user
+ * POST /auth/register
+ * Create a new user account with email and password
  */
-router.post('/magic-link', async (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response) => {
   try {
-    const parsed = magicLinkSchema.safeParse(req.body);
+    const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.errors[0].message });
       return;
     }
 
-    const { email } = parsed.data;
+    const { email, password, name } = parsed.data;
 
-    // Find or create user
-    let user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      user = await prisma.user.create({
-        data: { email },
-      });
-    }
-
-    // Generate magic link token
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    // Invalidate any existing unused magic links for this user
-    await prisma.magicLink.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { expiresAt: new Date() },
-    });
-
-    // Create new magic link
-    await prisma.magicLink.create({
-      data: {
-        token,
-        userId: user.id,
-        expiresAt,
-      },
-    });
-
-    // Send email
-    await sendMagicLinkEmail({ to: email, token });
-
-    res.json({ data: { message: 'Magic link sent to your email' } });
-  } catch (error) {
-    console.error('Magic link error:', error);
-    res.status(500).json({ error: 'Failed to send magic link' });
-  }
-});
-
-/**
- * POST /auth/verify
- * Verify a magic link token and return JWT + user
- */
-router.post('/verify', async (req: Request, res: Response) => {
-  try {
-    const parsed = verifyMagicLinkSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+    // Check if user already exists
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      res.status(409).json({ error: 'An account with this email already exists' });
       return;
     }
 
-    const { token } = parsed.data;
-
-    const magicLink = await prisma.magicLink.findUnique({
-      where: { token },
-      include: { user: true },
-    });
-
-    if (!magicLink) {
-      res.status(400).json({ error: 'Invalid or expired magic link' });
-      return;
-    }
-
-    if (magicLink.usedAt) {
-      res.status(400).json({ error: 'Magic link has already been used' });
-      return;
-    }
-
-    if (magicLink.expiresAt < new Date()) {
-      res.status(400).json({ error: 'Magic link has expired' });
-      return;
-    }
-
-    // Mark magic link as used
-    await prisma.magicLink.update({
-      where: { id: magicLink.id },
-      data: { usedAt: new Date() },
+    // Hash password and create user
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: { email, passwordHash, name },
     });
 
     // Generate JWT
-    const jwt = signToken({
-      userId: magicLink.user.id,
-      email: magicLink.user.email,
-      role: magicLink.user.role,
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
     });
 
-    res.json({
+    res.status(201).json({
       data: {
-        token: jwt,
+        token,
         user: {
-          id: magicLink.user.id,
-          email: magicLink.user.email,
-          name: magicLink.user.name,
-          role: magicLink.user.role,
-          avatarUrl: magicLink.user.avatarUrl,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
         },
       },
     });
   } catch (error) {
-    console.error('Verify error:', error);
-    res.status(500).json({ error: 'Failed to verify magic link' });
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+/**
+ * POST /auth/login
+ * Sign in with email and password
+ */
+router.post('/login', async (req: Request, res: Response) => {
+  try {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+
+    const { email, password } = parsed.data;
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !user.passwordHash) {
+      res.status(401).json({ error: 'Invalid email or password' });
+      return;
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: 'Invalid email or password' });
+      return;
+    }
+
+    // Generate JWT
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    res.json({
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Failed to sign in' });
+  }
+});
+
+/**
+ * GET /auth/me
+ * Get the current authenticated user
+ */
+router.get('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        avatarUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json({ data: user });
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({ error: 'Failed to get user' });
   }
 });
 

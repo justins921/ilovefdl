@@ -38,7 +38,7 @@ export type {
   // Auth types
   AuthTokens,
   AuthUser,
-  MagicLinkResponse,
+  LoginResponse,
 
   // Checkout types
   CheckoutLineItem,

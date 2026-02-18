@@ -11,11 +11,10 @@
 
 // Auth
 export {
-  magicLinkSchema,
-  verifyMagicLinkSchema,
   loginSchema,
+  registerSchema,
 } from './schemas/auth';
-export type { MagicLinkInput, VerifyMagicLinkInput, LoginInput } from './schemas/auth';
+export type { LoginInput, RegisterInput } from './schemas/auth';
 
 // Vendor
 export { createVendorSchema, updateVendorSchema } from './schemas/vendor';

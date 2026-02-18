@@ -1,42 +1,49 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
 
+  // Hash a default password for all demo accounts
+  const defaultHash = await bcrypt.hash("password123", 12);
+
   // Create admin user
   const admin = await prisma.user.upsert({
     where: { email: "admin@ilovefdl.com" },
-    update: {},
+    update: { passwordHash: defaultHash },
     create: {
       email: "admin@ilovefdl.com",
       name: "Admin",
       role: "ADMIN",
+      passwordHash: defaultHash,
     },
   });
-  console.log(`Admin user: ${admin.email}`);
+  console.log(`Admin user: ${admin.email} (password: password123)`);
 
   // Create editor user
   const editor = await prisma.user.upsert({
     where: { email: "editor@ilovefdl.com" },
-    update: {},
+    update: { passwordHash: defaultHash },
     create: {
       email: "editor@ilovefdl.com",
       name: "Editor",
       role: "EDITOR",
+      passwordHash: defaultHash,
     },
   });
-  console.log(`Editor user: ${editor.email}`);
+  console.log(`Editor user: ${editor.email} (password: password123)`);
 
   // Create sample vendor user
   const vendorUser = await prisma.user.upsert({
     where: { email: "vendor@ilovefdl.com" },
-    update: {},
+    update: { passwordHash: defaultHash },
     create: {
       email: "vendor@ilovefdl.com",
       name: "Sample Vendor",
       role: "VENDOR",
+      passwordHash: defaultHash,
     },
   });
 
@@ -230,6 +237,10 @@ async function main() {
   console.log("Created sample blog post");
 
   console.log("\nSeed completed successfully!");
+  console.log("\nDemo accounts (all use password: password123):");
+  console.log("  admin@ilovefdl.com  (ADMIN)");
+  console.log("  editor@ilovefdl.com (EDITOR)");
+  console.log("  vendor@ilovefdl.com (VENDOR)");
 }
 
 main()

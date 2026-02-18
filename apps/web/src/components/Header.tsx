@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Menu,
   X,
   ShoppingCart,
   User,
   Heart,
-  ChevronDown,
+  LogOut,
+  LayoutDashboard,
 } from 'lucide-react';
 
 const navLinks = [
@@ -18,8 +20,41 @@ const navLinks = [
   { label: 'Bars & Specials', href: '/bars' },
 ];
 
+interface AuthUser {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+}
+
 export default function Header() {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('ilovefdl_user');
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('ilovefdl_token');
+    localStorage.removeItem('ilovefdl_user');
+    localStorage.removeItem('ilovefdl_refresh_token');
+    setUser(null);
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+    router.push('/');
+  };
+
+  const dashboardHref = user?.role === 'ADMIN' ? '/admin' : '/dashboard';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-t-4 border-teal shadow-sm">
@@ -59,13 +94,52 @@ export default function Header() {
             >
               <ShoppingCart className="w-5 h-5" />
             </Link>
-            <Link
-              href="/auth"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white text-sm font-semibold rounded-lg hover:bg-accent/90 transition-colors"
-            >
-              <User className="w-4 h-4" />
-              Sign In
-            </Link>
+
+            {user ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-teal text-white text-sm font-semibold rounded-lg hover:bg-teal/90 transition-colors"
+                >
+                  <User className="w-4 h-4" />
+                  {user.name || user.email.split('@')[0]}
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-light py-1 z-50">
+                    <div className="px-4 py-2 border-b border-light">
+                      <p className="text-sm font-medium text-primary truncate">{user.name || user.email}</p>
+                      <p className="text-xs text-primary/50 truncate">{user.email}</p>
+                    </div>
+                    {(user.role === 'ADMIN' || user.role === 'VENDOR') && (
+                      <Link
+                        href={dashboardHref}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-primary/80 hover:bg-light transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        Dashboard
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-accent hover:bg-light transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                href="/auth"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white text-sm font-semibold rounded-lg hover:bg-accent/90 transition-colors"
+              >
+                <User className="w-4 h-4" />
+                Sign In
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -107,14 +181,37 @@ export default function Header() {
                 </Link>
               ))}
               <div className="border-t border-light mt-2 pt-3 px-4">
-                <Link
-                  href="/auth"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="inline-flex items-center gap-2 w-full justify-center px-4 py-3 bg-accent text-white font-semibold rounded-lg hover:bg-accent/90 transition-colors"
-                >
-                  <User className="w-4 h-4" />
-                  Sign In
-                </Link>
+                {user ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-primary">{user.name || user.email}</p>
+                    {(user.role === 'ADMIN' || user.role === 'VENDOR') && (
+                      <Link
+                        href={dashboardHref}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 py-2 text-sm text-primary/80"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        Dashboard
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 py-2 text-sm text-accent"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <Link
+                    href="/auth"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="inline-flex items-center gap-2 w-full justify-center px-4 py-3 bg-accent text-white font-semibold rounded-lg hover:bg-accent/90 transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    Sign In
+                  </Link>
+                )}
               </div>
             </nav>
           </div>

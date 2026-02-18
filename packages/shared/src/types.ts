@@ -321,8 +321,9 @@ export interface AuthUser {
   tokens: AuthTokens;
 }
 
-export interface MagicLinkResponse {
-  message: string;
+export interface LoginResponse {
+  token: string;
+  user: User;
 }
 
 // ─── CHECKOUT TYPES ─────────────────────────────────────

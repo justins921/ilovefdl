@@ -68,34 +68,22 @@ enum ExternalPlatform {
 // ─── USER ────────────────────────────────────────────────
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  role      Role     @default(USER)
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String?
+  role         Role     @default(USER)
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   vendor                 Vendor?
   orders                 Order[]
   blogPosts              BlogPost[]
   pushTokens             PushToken[]
   notificationPreference NotificationPreference?
-  magicLinks             MagicLink[]
 
   @@map("users")
-}
-
-model MagicLink {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  @@map("magic_links")
 }
 
 // ─── VENDOR ──────────────────────────────────────────────

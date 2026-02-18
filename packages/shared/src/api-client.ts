@@ -3,8 +3,7 @@ import type {
   ApiErrorResponse,
   PaginatedResponse,
   PaginationParams,
-  AuthUser,
-  MagicLinkResponse,
+  LoginResponse,
   CheckoutSession,
   CheckoutLineItem,
   User,
@@ -148,14 +147,14 @@ export class ApiClient {
 
   // ─── AUTH ─────────────────────────────────────────────
 
-  /** Send a magic link to the given email address */
-  async login(email: string): Promise<ApiResponse<MagicLinkResponse>> {
-    return this.post<ApiResponse<MagicLinkResponse>>('/auth/login', { email });
+  /** Sign in with email and password */
+  async login(email: string, password: string): Promise<ApiResponse<LoginResponse>> {
+    return this.post<ApiResponse<LoginResponse>>('/auth/login', { email, password });
   }
 
-  /** Verify a magic link token and receive auth tokens */
-  async verifyMagicLink(token: string): Promise<ApiResponse<AuthUser>> {
-    return this.post<ApiResponse<AuthUser>>('/auth/verify', { token });
+  /** Create a new account */
+  async register(email: string, password: string, name: string): Promise<ApiResponse<LoginResponse>> {
+    return this.post<ApiResponse<LoginResponse>>('/auth/register', { email, password, name });
   }
 
   /** Get the current authenticated user */
