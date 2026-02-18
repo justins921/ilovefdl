@@ -23,4 +23,4 @@ RUN npm run build --workspace=apps/api
 # Production
 ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma; node apps/api/dist/index.js"]
+CMD ["sh", "-c", "timeout 15 npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1 || echo 'Migration skipped'; node apps/api/dist/index.js"]
