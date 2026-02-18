@@ -1,7 +1,7 @@
 import { ApiClient } from '@ilovefdl/shared';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.ilovefdl.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://ilovefdlapi-production.up.railway.app';
 
 const TOKEN_KEY = 'ilovefdl_access_token';
 
