@@ -181,6 +181,11 @@ router.post('/:id/stripe-onboard', requireAuth, async (req: Request, res: Respon
 
     let stripeAccountId = vendor.stripeAccountId;
 
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe is not configured' });
+      return;
+    }
+
     // Create Stripe Connect account if one doesn't exist
     if (!stripeAccountId) {
       const account = await stripe.accounts.create({
@@ -231,6 +236,11 @@ router.get('/:id/stripe-dashboard', requireAuth, async (req: Request, res: Respo
 
     if (vendor.userId !== req.user!.id && req.user!.role !== 'ADMIN') {
       res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe is not configured' });
       return;
     }
 
