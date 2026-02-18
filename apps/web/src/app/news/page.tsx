@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Search, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Newspaper, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import BlogPostCard from '@/components/BlogPostCard';
 import api from '@/lib/api';
 import { formatCategoryName } from '@/lib/utils';
@@ -21,6 +21,18 @@ const categories = [
 ];
 
 export default function NewsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-light flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-teal animate-spin" />
+      </div>
+    }>
+      <NewsContent />
+    </Suspense>
+  );
+}
+
+function NewsContent() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get('category') || 'ALL';
 
