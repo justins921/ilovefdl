@@ -36,6 +36,11 @@ app.post(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// ─── Health check (before auth so it responds instantly) ──
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // ─── Cookie parsing (manual, lightweight) ────────────────
 app.use((req, _res, next) => {
   const cookieHeader = req.headers.cookie;
@@ -68,11 +73,6 @@ app.use('/posts', blogRoutes);
 app.use('/bars', barRoutes);
 app.use('/specials', specialRoutes);
 app.use('/push', notificationRoutes);
-
-// ─── Health check ────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
 // ─── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {
