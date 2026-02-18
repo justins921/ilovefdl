@@ -37,6 +37,11 @@ router.post('/checkout/session', requireAuth, async (req: Request, res: Response
       return;
     }
 
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe is not configured' });
+      return;
+    }
+
     if (!vendor.stripeAccountId || !vendor.stripeOnboarded) {
       res.status(400).json({ error: 'Vendor has not completed Stripe setup' });
       return;
@@ -226,9 +231,9 @@ router.post('/webhooks/stripe', async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature'] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET not configured');
-    res.status(500).json({ error: 'Webhook not configured' });
+  if (!stripe || !webhookSecret) {
+    console.error('Stripe not configured');
+    res.status(500).json({ error: 'Stripe not configured' });
     return;
   }
 
