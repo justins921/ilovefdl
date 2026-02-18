@@ -1,8 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "cd ../.. && npm install && npx prisma generate --schema=apps/api/prisma/schema.prisma && npm run build:web",
-  "outputDirectory": ".next",
-  "installCommand": "cd ../.. && npm install",
+  "installCommand": "cd ../.. && npm install && npx prisma generate --schema=apps/api/prisma/schema.prisma",
   "regions": ["cle1"],
   "headers": [
     {
