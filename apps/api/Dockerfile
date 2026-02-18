@@ -23,4 +23,4 @@ RUN npm run build --workspace=apps/api
 # Production
 ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["sh", "-c", "echo 'Starting migration...' && timeout 15 ./node_modules/.bin/prisma migrate deploy --schema=apps/api/prisma/schema.prisma 2>&1 || echo 'Migration skipped' && echo 'Starting server...' && node apps/api/dist/index.js"]
+CMD ["sh", "-c", "echo 'Running migrations...' ; timeout 15 ./node_modules/.bin/prisma migrate deploy --schema=apps/api/prisma/schema.prisma || echo 'Migration skipped' ; echo 'Starting server on port ${PORT:-4000}...' ; node apps/api/dist/index.js"]

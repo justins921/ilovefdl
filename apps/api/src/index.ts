@@ -97,8 +97,8 @@ app.use(
 );
 
 // ─── Start server ────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`API server running on port ${PORT}`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`API server running on 0.0.0.0:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
