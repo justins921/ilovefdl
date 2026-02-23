@@ -1,22 +1,47 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Store,
-  ShoppingBag,
-  ShoppingCart,
-  DollarSign,
-  TrendingUp,
-  Users,
+  BarChart3,
   Newspaper,
   Beer,
-  ArrowRight,
-  Clock,
+  ShoppingBag,
+  Store,
+  Plus,
+  Pencil,
+  X,
+  Menu,
+  Loader2,
+  AlertCircle,
+  ShoppingCart,
+  DollarSign,
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  ListFilter,
+  ImageIcon,
 } from 'lucide-react';
 import api from '@/lib/api';
-import { formatPrice, formatDate } from '@/lib/utils';
-import type { Order, Vendor, Product, BlogPost } from '@ilovefdl/shared';
+import { useAuth } from '@/components/AuthProvider';
+import { formatPrice, formatDate, formatCategoryName, slugify } from '@/lib/utils';
+import type {
+  Vendor,
+  Product,
+  BlogPost,
+  Bar,
+  Special,
+  Order,
+} from '@ilovefdl/shared';
+import {
+  PostCategory,
+  PostStatus,
+  DayOfWeek,
+  ExternalPlatform,
+} from '@ilovefdl/shared';
+
+// ─── TYPES ──────────────────────────────────────────────
+
+type ActiveTab = 'overview' | 'posts' | 'bars' | 'products' | 'vendors';
 
 interface DashboardStats {
   vendorCount: number;
@@ -25,7 +50,110 @@ interface DashboardStats {
   revenue: number;
 }
 
+// ─── SIDEBAR NAV ITEMS ──────────────────────────────────
+
+const navItems: { id: ActiveTab; label: string; icon: typeof BarChart3 }[] = [
+  { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'posts', label: 'Blog Posts', icon: Newspaper },
+  { id: 'bars', label: 'Bars & Specials', icon: Beer },
+  { id: 'products', label: 'Products', icon: ShoppingBag },
+  { id: 'vendors', label: 'Vendors', icon: Store },
+];
+
+// ─── MAIN COMPONENT ─────────────────────────────────────
+
 export default function AdminPage() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-light flex">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-light transform transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between px-6 py-5 border-b border-light">
+          <h2 className="text-lg font-bold text-primary">Admin</h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-primary/60 hover:text-primary"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <nav className="p-4 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setSidebarOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary text-white'
+                    : 'text-primary/70 hover:bg-light hover:text-primary'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        {user && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-light">
+            <p className="text-xs text-primary/50 truncate">{user.email}</p>
+          </div>
+        )}
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 min-w-0">
+        {/* Top bar with hamburger */}
+        <div className="bg-white border-b border-light px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden text-primary/60 hover:text-primary"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-primary">
+              {navItems.find((n) => n.id === activeTab)?.label ?? 'Dashboard'}
+            </h1>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 lg:p-8">
+          {activeTab === 'overview' && <OverviewSection />}
+          {activeTab === 'posts' && <BlogPostsSection />}
+          {activeTab === 'bars' && <BarsSection />}
+          {activeTab === 'products' && <ProductsSection />}
+          {activeTab === 'vendors' && <VendorsSection />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ─── OVERVIEW SECTION ───────────────────────────────────
+
+function OverviewSection() {
   const [stats, setStats] = useState<DashboardStats>({
     vendorCount: 0,
     productCount: 0,
@@ -36,7 +164,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchDashboardData() {
+    async function fetchData() {
       try {
         const [vendorsRes, productsRes, ordersRes] = await Promise.all([
           api.getVendors({ limit: 1 }),
@@ -57,43 +185,19 @@ export default function AdminPage() {
         });
         setRecentOrders(ordersRes.data);
       } catch {
-        // Dashboard data failed - show zeros
+        // Dashboard data failed — show zeros
       } finally {
         setLoading(false);
       }
     }
-    fetchDashboardData();
+    fetchData();
   }, []);
 
   const statCards = [
-    {
-      label: 'Total Vendors',
-      value: stats.vendorCount,
-      icon: Store,
-      color: 'text-teal',
-      bg: 'bg-teal/10',
-    },
-    {
-      label: 'Total Products',
-      value: stats.productCount,
-      icon: ShoppingBag,
-      color: 'text-accent',
-      bg: 'bg-accent/10',
-    },
-    {
-      label: 'Total Orders',
-      value: stats.orderCount,
-      icon: ShoppingCart,
-      color: 'text-primary',
-      bg: 'bg-primary/10',
-    },
-    {
-      label: 'Revenue',
-      value: formatPrice(stats.revenue),
-      icon: DollarSign,
-      color: 'text-teal',
-      bg: 'bg-teal/10',
-    },
+    { label: 'Total Vendors', value: stats.vendorCount, icon: Store, color: 'text-teal', bg: 'bg-teal/10' },
+    { label: 'Total Products', value: stats.productCount, icon: ShoppingBag, color: 'text-accent', bg: 'bg-accent/10' },
+    { label: 'Total Orders', value: stats.orderCount, icon: ShoppingCart, color: 'text-primary', bg: 'bg-primary/10' },
+    { label: 'Revenue', value: formatPrice(stats.revenue), icon: DollarSign, color: 'text-teal', bg: 'bg-teal/10' },
   ];
 
   const statusColors: Record<string, string> = {
@@ -105,143 +209,1755 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-light">
-      {/* Header */}
-      <div className="bg-white border-b border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-primary mb-1">
-            Admin Dashboard
-          </h1>
-          <p className="text-primary/60">
-            Manage the I Love FDL platform
-          </p>
-        </div>
+    <>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {statCards.map((stat) => (
+          <div key={stat.label} className="bg-white rounded-xl border border-light p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className={`w-10 h-10 ${stat.bg} rounded-lg flex items-center justify-center`}>
+                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-primary">
+              {loading ? (
+                <span className="inline-block w-16 h-7 bg-light rounded animate-pulse" />
+              ) : (
+                stat.value
+              )}
+            </p>
+            <p className="text-sm text-primary/60 mt-1">{stat.label}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          {statCards.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white rounded-xl border border-light p-6"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 ${stat.bg} rounded-lg flex items-center justify-center`}>
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-primary">
-                {loading ? (
-                  <span className="inline-block w-16 h-7 bg-light rounded animate-pulse" />
-                ) : (
-                  stat.value
-                )}
-              </p>
-              <p className="text-sm text-primary/60 mt-1">{stat.label}</p>
-            </div>
-          ))}
+      {/* Recent Orders */}
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        <div className="px-6 py-4 border-b border-light">
+          <h2 className="text-lg font-bold text-primary">Recent Orders</h2>
         </div>
-
-        {/* Quick Links */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          {[
-            { label: 'Manage Vendors', href: '/vendors', icon: Store, color: 'border-teal' },
-            { label: 'Manage Products', href: '/marketplace', icon: ShoppingBag, color: 'border-accent' },
-            { label: 'Blog Posts', href: '/news', icon: Newspaper, color: 'border-primary' },
-            { label: 'Bars & Specials', href: '/bars', icon: Beer, color: 'border-teal' },
-          ].map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`bg-white rounded-xl border-l-4 ${link.color} border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group`}
-            >
-              <div className="flex items-center gap-3">
-                <link.icon className="w-5 h-5 text-primary/60" />
-                <span className="font-medium text-primary">{link.label}</span>
+        {loading ? (
+          <div className="p-6 space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="animate-pulse flex items-center gap-4">
+                <div className="h-4 bg-light rounded w-1/6" />
+                <div className="h-4 bg-light rounded w-1/4" />
+                <div className="h-4 bg-light rounded w-1/6" />
+                <div className="h-4 bg-light rounded w-1/6" />
               </div>
-              <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-            </Link>
-          ))}
-        </div>
-
-        {/* Recent Orders Table */}
-        <div className="bg-white rounded-xl border border-light overflow-hidden">
-          <div className="px-6 py-4 border-b border-light flex items-center justify-between">
-            <h2 className="text-lg font-bold text-primary">Recent Orders</h2>
-            <Clock className="w-4 h-4 text-primary/40" />
+            ))}
           </div>
+        ) : recentOrders.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Order ID</th>
+                  <th className="px-6 py-3">Customer</th>
+                  <th className="px-6 py-3">Vendor</th>
+                  <th className="px-6 py-3">Total</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {recentOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-mono text-primary/60">
+                      {order.id.slice(0, 8)}...
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary">
+                      {order.user?.name || order.user?.email || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {order.vendor?.businessName || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-primary">
+                      {formatPrice(order.total)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          statusColors[order.status] || 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {formatDate(order.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-12 text-center">
+            <ShoppingCart className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No orders yet.</p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
-          {loading ? (
-            <div className="p-6 space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse flex items-center gap-4"
-                >
-                  <div className="h-4 bg-light rounded w-1/6" />
-                  <div className="h-4 bg-light rounded w-1/4" />
-                  <div className="h-4 bg-light rounded w-1/6" />
-                  <div className="h-4 bg-light rounded w-1/6" />
-                </div>
-              ))}
+// ─── BLOG POSTS SECTION ─────────────────────────────────
+
+function BlogPostsSection() {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [formTitle, setFormTitle] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [formContent, setFormContent] = useState('');
+  const [formExcerpt, setFormExcerpt] = useState('');
+  const [formCategory, setFormCategory] = useState<PostCategory>(PostCategory.UNCATEGORIZED);
+  const [formStatus, setFormStatus] = useState<PostStatus>(PostStatus.DRAFT);
+  const [formFeaturedImage, setFormFeaturedImage] = useState('');
+  const [formTags, setFormTags] = useState('');
+
+  const fetchPosts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getPosts({ limit: 50 });
+      setPosts(res.data);
+    } catch {
+      setError('Failed to load blog posts.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
+
+  function resetForm() {
+    setFormTitle('');
+    setFormSlug('');
+    setFormContent('');
+    setFormExcerpt('');
+    setFormCategory(PostCategory.UNCATEGORIZED);
+    setFormStatus(PostStatus.DRAFT);
+    setFormFeaturedImage('');
+    setFormTags('');
+  }
+
+  function openCreate() {
+    setEditingPost(null);
+    resetForm();
+    setShowModal(true);
+  }
+
+  function openEdit(post: BlogPost) {
+    setEditingPost(post);
+    setFormTitle(post.title);
+    setFormSlug(post.slug);
+    setFormContent(post.content);
+    setFormExcerpt(post.excerpt ?? '');
+    setFormCategory(post.category);
+    setFormStatus(post.status);
+    setFormFeaturedImage(post.featuredImage ?? '');
+    setFormTags(post.tags.join(', '));
+    setShowModal(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const data = {
+        title: formTitle,
+        slug: formSlug,
+        content: formContent,
+        excerpt: formExcerpt || undefined,
+        category: formCategory,
+        status: formStatus,
+        featuredImage: formFeaturedImage || undefined,
+        tags: formTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+      };
+
+      if (editingPost) {
+        await api.updatePost(editingPost.id, data);
+      } else {
+        await api.createPost(data);
+      }
+
+      setShowModal(false);
+      resetForm();
+      await fetchPosts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save post.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const postStatusColors: Record<string, string> = {
+    DRAFT: 'bg-gray-100 text-gray-800',
+    PUBLISHED: 'bg-green-100 text-green-800',
+    SCHEDULED: 'bg-blue-100 text-blue-800',
+  };
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-sm text-primary/60">{posts.length} posts total</p>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          New Post
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="p-12 text-center">
+            <Newspaper className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No blog posts yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Title</th>
+                  <th className="px-6 py-3">Category</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Author</th>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {posts.map((post) => (
+                  <tr key={post.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-primary max-w-xs truncate">
+                      {post.title}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {formatCategoryName(post.category)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          postStatusColors[post.status] || 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {post.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {post.author?.name || post.author?.email || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {formatDate(post.createdAt)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => openEdit(post)}
+                        className="text-primary/50 hover:text-primary transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-primary">
+                {editingPost ? 'Edit Post' : 'New Post'}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-primary/40 hover:text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ) : recentOrders.length > 0 ? (
+
+            <div className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Title</label>
+                <input
+                  type="text"
+                  value={formTitle}
+                  onChange={(e) => {
+                    setFormTitle(e.target.value);
+                    if (!editingPost) {
+                      setFormSlug(slugify(e.target.value));
+                    }
+                  }}
+                  className="input-field w-full"
+                  placeholder="Post title"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={formSlug}
+                  onChange={(e) => setFormSlug(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="post-slug"
+                />
+              </div>
+
+              {/* Content */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Content</label>
+                <textarea
+                  value={formContent}
+                  onChange={(e) => setFormContent(e.target.value)}
+                  className="input-field w-full h-40 resize-y"
+                  placeholder="Write your post content..."
+                />
+              </div>
+
+              {/* Excerpt */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Excerpt</label>
+                <textarea
+                  value={formExcerpt}
+                  onChange={(e) => setFormExcerpt(e.target.value)}
+                  className="input-field w-full h-20 resize-y"
+                  placeholder="Brief summary..."
+                />
+              </div>
+
+              {/* Category & Status row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Category</label>
+                  <select
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value as PostCategory)}
+                    className="input-field w-full"
+                  >
+                    {Object.values(PostCategory).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {formatCategoryName(cat)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Status</label>
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as PostStatus)}
+                    className="input-field w-full"
+                  >
+                    {Object.values(PostStatus).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Featured Image */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Featured Image URL
+                </label>
+                <input
+                  type="text"
+                  value={formFeaturedImage}
+                  onChange={(e) => setFormFeaturedImage(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="https://..."
+                />
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={formTags}
+                  onChange={(e) => setFormTags(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="news, local, events"
+                />
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+              <button
+                onClick={() => setShowModal(false)}
+                className="btn-outline"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="btn-primary flex items-center gap-2"
+                disabled={saving}
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editingPost ? 'Update Post' : 'Create Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── BARS & SPECIALS SECTION ────────────────────────────
+
+function BarsSection() {
+  const [bars, setBars] = useState<Bar[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showBarModal, setShowBarModal] = useState(false);
+  const [editingBar, setEditingBar] = useState<Bar | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Bar form state
+  const [barName, setBarName] = useState('');
+  const [barSlug, setBarSlug] = useState('');
+  const [barAddress, setBarAddress] = useState('');
+  const [barDescription, setBarDescription] = useState('');
+  const [barPhone, setBarPhone] = useState('');
+  const [barWebsite, setBarWebsite] = useState('');
+
+  // Specials sub-section
+  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
+  const [specials, setSpecials] = useState<Special[]>([]);
+  const [loadingSpecials, setLoadingSpecials] = useState(false);
+  const [showSpecialModal, setShowSpecialModal] = useState(false);
+  const [editingSpecial, setEditingSpecial] = useState<Special | null>(null);
+  const [savingSpecial, setSavingSpecial] = useState(false);
+
+  // Special form state
+  const [specialDay, setSpecialDay] = useState<DayOfWeek>(DayOfWeek.MONDAY);
+  const [specialTitle, setSpecialTitle] = useState('');
+  const [specialDescription, setSpecialDescription] = useState('');
+  const [specialPrice, setSpecialPrice] = useState('');
+  const [specialStartTime, setSpecialStartTime] = useState('');
+  const [specialEndTime, setSpecialEndTime] = useState('');
+  const [specialIsFeatured, setSpecialIsFeatured] = useState(false);
+
+  const fetchBars = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getBars({ limit: 50 });
+      setBars(res.data);
+    } catch {
+      setError('Failed to load bars.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBars();
+  }, [fetchBars]);
+
+  const fetchSpecials = useCallback(async (barId: string) => {
+    setLoadingSpecials(true);
+    try {
+      const res = await api.getSpecials({ barId });
+      setSpecials(res.data);
+    } catch {
+      setSpecials([]);
+    } finally {
+      setLoadingSpecials(false);
+    }
+  }, []);
+
+  function resetBarForm() {
+    setBarName('');
+    setBarSlug('');
+    setBarAddress('');
+    setBarDescription('');
+    setBarPhone('');
+    setBarWebsite('');
+  }
+
+  function resetSpecialForm() {
+    setSpecialDay(DayOfWeek.MONDAY);
+    setSpecialTitle('');
+    setSpecialDescription('');
+    setSpecialPrice('');
+    setSpecialStartTime('');
+    setSpecialEndTime('');
+    setSpecialIsFeatured(false);
+  }
+
+  function openCreateBar() {
+    setEditingBar(null);
+    resetBarForm();
+    setShowBarModal(true);
+  }
+
+  function openEditBar(bar: Bar) {
+    setEditingBar(bar);
+    setBarName(bar.name);
+    setBarSlug(bar.slug);
+    setBarAddress(bar.address);
+    setBarDescription(bar.description ?? '');
+    setBarPhone(bar.phone ?? '');
+    setBarWebsite(bar.website ?? '');
+    setShowBarModal(true);
+  }
+
+  function openBarSpecials(bar: Bar) {
+    setSelectedBar(bar);
+    fetchSpecials(bar.id);
+  }
+
+  function openCreateSpecial() {
+    setEditingSpecial(null);
+    resetSpecialForm();
+    setShowSpecialModal(true);
+  }
+
+  function openEditSpecial(special: Special) {
+    setEditingSpecial(special);
+    setSpecialDay(special.dayOfWeek);
+    setSpecialTitle(special.title);
+    setSpecialDescription(special.description ?? '');
+    setSpecialPrice(special.price ?? '');
+    setSpecialStartTime(special.startTime ?? '');
+    setSpecialEndTime(special.endTime ?? '');
+    setSpecialIsFeatured(special.isFeatured);
+    setShowSpecialModal(true);
+  }
+
+  async function handleSaveBar() {
+    setSaving(true);
+    setError(null);
+    try {
+      const data = {
+        name: barName,
+        slug: barSlug,
+        address: barAddress,
+        description: barDescription || undefined,
+        phone: barPhone || undefined,
+        website: barWebsite || undefined,
+        isActive: true,
+        photos: [],
+      };
+
+      if (editingBar) {
+        await api.updateBar(editingBar.id, data);
+      } else {
+        await api.createBar(data);
+      }
+
+      setShowBarModal(false);
+      resetBarForm();
+      await fetchBars();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save bar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveSpecial() {
+    if (!selectedBar) return;
+    setSavingSpecial(true);
+    setError(null);
+    try {
+      const data = {
+        barId: selectedBar.id,
+        dayOfWeek: specialDay,
+        title: specialTitle,
+        description: specialDescription || undefined,
+        price: specialPrice || undefined,
+        startTime: specialStartTime || undefined,
+        endTime: specialEndTime || undefined,
+        isFeatured: specialIsFeatured,
+        isActive: true,
+      };
+
+      if (editingSpecial) {
+        // updateSpecial doesn't include barId in the schema
+        const { barId: _, ...updateData } = data;
+        await api.updateSpecial(editingSpecial.id, updateData);
+      } else {
+        await api.createSpecial(data);
+      }
+
+      setShowSpecialModal(false);
+      resetSpecialForm();
+      await fetchSpecials(selectedBar.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save special.');
+    } finally {
+      setSavingSpecial(false);
+    }
+  }
+
+  async function handleToggleBarActive(bar: Bar) {
+    try {
+      await api.updateBar(bar.id, { isActive: !bar.isActive });
+      await fetchBars();
+    } catch {
+      setError('Failed to update bar status.');
+    }
+  }
+
+  // ─── If viewing specials for a specific bar ──────────
+
+  if (selectedBar) {
+    return (
+      <>
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setSelectedBar(null)}
+            className="text-primary/50 hover:text-primary transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="text-lg font-bold text-primary">{selectedBar.name}</h3>
+            <p className="text-sm text-primary/60">Manage specials for this bar</p>
+          </div>
+          <div className="ml-auto">
+            <button onClick={openCreateSpecial} className="btn-primary flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Add Special
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="bg-white rounded-xl border border-light overflow-hidden">
+          {loadingSpecials ? (
+            <div className="p-8 flex justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+            </div>
+          ) : specials.length === 0 ? (
+            <div className="p-12 text-center">
+              <Beer className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+              <p className="text-primary/60 text-sm">No specials yet for this bar.</p>
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
-                    <th className="px-6 py-3">Order ID</th>
-                    <th className="px-6 py-3">Customer</th>
-                    <th className="px-6 py-3">Vendor</th>
-                    <th className="px-6 py-3">Total</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3">Day</th>
+                    <th className="px-6 py-3">Title</th>
+                    <th className="px-6 py-3">Price</th>
+                    <th className="px-6 py-3">Time</th>
+                    <th className="px-6 py-3">Featured</th>
+                    <th className="px-6 py-3">Active</th>
+                    <th className="px-6 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-light">
-                  {recentOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-light/50 transition-colors"
-                    >
-                      <td className="px-6 py-4 text-sm font-mono text-primary/60">
-                        {order.id.slice(0, 8)}...
+                  {specials.map((special) => (
+                    <tr key={special.id} className="hover:bg-light/50 transition-colors">
+                      <td className="px-6 py-4 text-sm text-primary font-medium">
+                        {special.dayOfWeek.charAt(0) + special.dayOfWeek.slice(1).toLowerCase()}
                       </td>
-                      <td className="px-6 py-4 text-sm text-primary">
-                        {order.user?.name || order.user?.email || 'Unknown'}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-primary">{special.title}</td>
+                      <td className="px-6 py-4 text-sm text-primary/60">{special.price || '-'}</td>
                       <td className="px-6 py-4 text-sm text-primary/60">
-                        {order.vendor?.businessName || 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-primary">
-                        {formatPrice(order.total)}
+                        {special.startTime && special.endTime
+                          ? `${special.startTime} - ${special.endTime}`
+                          : special.startTime || special.endTime || '-'}
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            statusColors[order.status] || 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {order.status}
-                        </span>
+                        {special.isFeatured ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Featured
+                          </span>
+                        ) : (
+                          <span className="text-primary/30 text-xs">No</span>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-primary/60">
-                        {formatDate(order.createdAt)}
+                      <td className="px-6 py-4">
+                        {special.isActive ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => openEditSpecial(special)}
+                          className="text-primary/50 hover:text-primary transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="p-12 text-center">
-              <ShoppingCart className="w-10 h-10 text-primary/20 mx-auto mb-3" />
-              <p className="text-primary/60 text-sm">No orders yet.</p>
-            </div>
           )}
         </div>
+
+        {/* Special Modal */}
+        {showSpecialModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-primary">
+                  {editingSpecial ? 'Edit Special' : 'Add Special'}
+                </h3>
+                <button
+                  onClick={() => setShowSpecialModal(false)}
+                  className="text-primary/40 hover:text-primary"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Day of Week */}
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">
+                    Day of Week
+                  </label>
+                  <select
+                    value={specialDay}
+                    onChange={(e) => setSpecialDay(e.target.value as DayOfWeek)}
+                    className="input-field w-full"
+                  >
+                    {Object.values(DayOfWeek).map((day) => (
+                      <option key={day} value={day}>
+                        {day.charAt(0) + day.slice(1).toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={specialTitle}
+                    onChange={(e) => setSpecialTitle(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="Special title"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={specialDescription}
+                    onChange={(e) => setSpecialDescription(e.target.value)}
+                    className="input-field w-full h-20 resize-y"
+                    placeholder="Describe the special..."
+                  />
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Price</label>
+                  <input
+                    type="text"
+                    value={specialPrice}
+                    onChange={(e) => setSpecialPrice(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="$5.00"
+                  />
+                </div>
+
+                {/* Time row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-1">
+                      Start Time (HH:MM)
+                    </label>
+                    <input
+                      type="text"
+                      value={specialStartTime}
+                      onChange={(e) => setSpecialStartTime(e.target.value)}
+                      className="input-field w-full"
+                      placeholder="11:00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-1">
+                      End Time (HH:MM)
+                    </label>
+                    <input
+                      type="text"
+                      value={specialEndTime}
+                      onChange={(e) => setSpecialEndTime(e.target.value)}
+                      className="input-field w-full"
+                      placeholder="14:00"
+                    />
+                  </div>
+                </div>
+
+                {/* Is Featured */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="specialFeatured"
+                    checked={specialIsFeatured}
+                    onChange={(e) => setSpecialIsFeatured(e.target.checked)}
+                    className="w-4 h-4 rounded border-light text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="specialFeatured" className="text-sm font-medium text-primary">
+                    Is Featured
+                  </label>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+                <button
+                  onClick={() => setShowSpecialModal(false)}
+                  className="btn-outline"
+                  disabled={savingSpecial}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSpecial}
+                  className="btn-primary flex items-center gap-2"
+                  disabled={savingSpecial}
+                >
+                  {savingSpecial && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {editingSpecial ? 'Update Special' : 'Create Special'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ─── Bars listing ─────────────────────────────────────
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-sm text-primary/60">{bars.length} bars total</p>
+        <button onClick={openCreateBar} className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          New Bar
+        </button>
       </div>
-    </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+          </div>
+        ) : bars.length === 0 ? (
+          <div className="p-12 text-center">
+            <Beer className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No bars yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Name</th>
+                  <th className="px-6 py-3">Address</th>
+                  <th className="px-6 py-3">Phone</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {bars.map((bar) => (
+                  <tr key={bar.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-primary">{bar.name}</td>
+                    <td className="px-6 py-4 text-sm text-primary/60 max-w-xs truncate">
+                      {bar.address}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">{bar.phone || '-'}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          bar.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {bar.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEditBar(bar)}
+                          className="text-primary/50 hover:text-primary transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleBarActive(bar)}
+                          className="text-primary/50 hover:text-primary transition-colors"
+                          title={bar.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          {bar.isActive ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => openBarSpecials(bar)}
+                          className="text-teal hover:text-teal/80 transition-colors text-xs font-medium"
+                          title="Manage Specials"
+                        >
+                          <ListFilter className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Bar Modal */}
+      {showBarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-primary">
+                {editingBar ? 'Edit Bar' : 'New Bar'}
+              </h3>
+              <button
+                onClick={() => setShowBarModal(false)}
+                className="text-primary/40 hover:text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Name</label>
+                <input
+                  type="text"
+                  value={barName}
+                  onChange={(e) => {
+                    setBarName(e.target.value);
+                    if (!editingBar) {
+                      setBarSlug(slugify(e.target.value));
+                    }
+                  }}
+                  className="input-field w-full"
+                  placeholder="Bar name"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={barSlug}
+                  onChange={(e) => setBarSlug(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="bar-slug"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Address</label>
+                <input
+                  type="text"
+                  value={barAddress}
+                  onChange={(e) => setBarAddress(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="123 Main St, Fond du Lac, WI"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Description</label>
+                <textarea
+                  value={barDescription}
+                  onChange={(e) => setBarDescription(e.target.value)}
+                  className="input-field w-full h-20 resize-y"
+                  placeholder="About this bar..."
+                />
+              </div>
+
+              {/* Phone & Website row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={barPhone}
+                    onChange={(e) => setBarPhone(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="(920) 555-1234"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Website</label>
+                  <input
+                    type="text"
+                    value={barWebsite}
+                    onChange={(e) => setBarWebsite(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+              <button
+                onClick={() => setShowBarModal(false)}
+                className="btn-outline"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveBar}
+                className="btn-primary flex items-center gap-2"
+                disabled={saving}
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editingBar ? 'Update Bar' : 'Create Bar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── PRODUCTS SECTION ───────────────────────────────────
+
+function ProductsSection() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [formName, setFormName] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [formPrice, setFormPrice] = useState('');
+  const [formCompareAtPrice, setFormCompareAtPrice] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formCategoryTags, setFormCategoryTags] = useState('');
+  const [formInventory, setFormInventory] = useState('0');
+  const [formImages, setFormImages] = useState('');
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getProducts({ limit: 100 });
+      setProducts(res.data);
+    } catch {
+      setError('Failed to load products.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  function resetForm() {
+    setFormName('');
+    setFormSlug('');
+    setFormPrice('');
+    setFormCompareAtPrice('');
+    setFormDescription('');
+    setFormCategoryTags('');
+    setFormInventory('0');
+    setFormImages('');
+  }
+
+  function openCreate() {
+    setEditingProduct(null);
+    resetForm();
+    setShowModal(true);
+  }
+
+  function openEdit(product: Product) {
+    setEditingProduct(product);
+    setFormName(product.name);
+    setFormSlug(product.slug);
+    setFormPrice(String(product.price));
+    setFormCompareAtPrice(product.compareAtPrice ? String(product.compareAtPrice) : '');
+    setFormDescription(product.description ?? '');
+    setFormCategoryTags(product.categoryTags.join(', '));
+    setFormInventory(String(product.inventory));
+    setFormImages(product.images.join('\n'));
+    setShowModal(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const data = {
+        name: formName,
+        slug: formSlug,
+        price: parseFloat(formPrice) || 0,
+        compareAtPrice: formCompareAtPrice ? parseFloat(formCompareAtPrice) : undefined,
+        description: formDescription || undefined,
+        categoryTags: formCategoryTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+        inventory: parseInt(formInventory, 10) || 0,
+        images: formImages
+          .split('\n')
+          .map((url) => url.trim())
+          .filter(Boolean),
+        isActive: true,
+        externalPlatform: ExternalPlatform.NATIVE,
+      };
+
+      if (editingProduct) {
+        await api.updateProduct(editingProduct.id, data);
+      } else {
+        await api.createProduct(data);
+      }
+
+      setShowModal(false);
+      resetForm();
+      await fetchProducts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save product.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleActive(product: Product) {
+    try {
+      await api.updateProduct(product.id, { isActive: !product.isActive });
+      await fetchProducts();
+    } catch {
+      setError('Failed to update product status.');
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-sm text-primary/60">{products.length} products total</p>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          New Product
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="p-12 text-center">
+            <ShoppingBag className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No products yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Image</th>
+                  <th className="px-6 py-3">Name</th>
+                  <th className="px-6 py-3">Vendor</th>
+                  <th className="px-6 py-3">Price</th>
+                  <th className="px-6 py-3">Inventory</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {products.map((product) => (
+                  <tr key={product.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4">
+                      {product.images.length > 0 ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="w-10 h-10 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-light flex items-center justify-center">
+                          <ImageIcon className="w-4 h-4 text-primary/30" />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-primary max-w-xs truncate">
+                      {product.name}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {product.vendor?.businessName || product.vendorId.slice(0, 8) + '...'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-primary">
+                      {formatPrice(product.price)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">{product.inventory}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          product.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {product.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEdit(product)}
+                          className="text-primary/50 hover:text-primary transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleActive(product)}
+                          className="text-primary/50 hover:text-primary transition-colors"
+                          title={product.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          {product.isActive ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Product Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-primary">
+                {editingProduct ? 'Edit Product' : 'New Product'}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-primary/40 hover:text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Name</label>
+                <input
+                  type="text"
+                  value={formName}
+                  onChange={(e) => {
+                    setFormName(e.target.value);
+                    if (!editingProduct) {
+                      setFormSlug(slugify(e.target.value));
+                    }
+                  }}
+                  className="input-field w-full"
+                  placeholder="Product name"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={formSlug}
+                  onChange={(e) => setFormSlug(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="product-slug"
+                />
+              </div>
+
+              {/* Price row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">
+                    Compare At Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formCompareAtPrice}
+                    onChange={(e) => setFormCompareAtPrice(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Description</label>
+                <textarea
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="input-field w-full h-28 resize-y"
+                  placeholder="Product description..."
+                />
+              </div>
+
+              {/* Category Tags */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Category Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={formCategoryTags}
+                  onChange={(e) => setFormCategoryTags(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="clothing, accessories"
+                />
+              </div>
+
+              {/* Inventory */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Inventory</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formInventory}
+                  onChange={(e) => setFormInventory(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Images */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Image URLs (one per line)
+                </label>
+                <textarea
+                  value={formImages}
+                  onChange={(e) => setFormImages(e.target.value)}
+                  className="input-field w-full h-24 resize-y"
+                  placeholder={"https://example.com/image1.jpg\nhttps://example.com/image2.jpg"}
+                />
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+              <button
+                onClick={() => setShowModal(false)}
+                className="btn-outline"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="btn-primary flex items-center gap-2"
+                disabled={saving}
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editingProduct ? 'Update Product' : 'Create Product'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── VENDORS SECTION ────────────────────────────────────
+
+function VendorsSection() {
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [formBusinessName, setFormBusinessName] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formAddress, setFormAddress] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formWebsite, setFormWebsite] = useState('');
+  const [formStatus, setFormStatus] = useState<string>('PENDING');
+
+  const fetchVendors = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getVendors({ limit: 100 });
+      setVendors(res.data);
+    } catch {
+      setError('Failed to load vendors.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVendors();
+  }, [fetchVendors]);
+
+  function openEdit(vendor: Vendor) {
+    setEditingVendor(vendor);
+    setFormBusinessName(vendor.businessName);
+    setFormSlug(vendor.slug);
+    setFormDescription(vendor.description ?? '');
+    setFormAddress(vendor.address ?? '');
+    setFormPhone(vendor.phone ?? '');
+    setFormWebsite(vendor.website ?? '');
+    setFormStatus(vendor.status);
+    setShowModal(true);
+  }
+
+  async function handleSave() {
+    if (!editingVendor) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const data: Record<string, unknown> = {
+        businessName: formBusinessName,
+        slug: formSlug,
+        description: formDescription || undefined,
+        address: formAddress || undefined,
+        phone: formPhone || undefined,
+        website: formWebsite || undefined,
+      };
+
+      // Status is managed separately -- pass it as part of the update
+      // The updateVendorSchema is partial of createVendorSchema which doesn't include status.
+      // But the API endpoint may accept status for admin updates.
+      // We send it and let the server decide.
+      (data as Record<string, unknown>).status = formStatus;
+
+      await api.updateVendor(editingVendor.id, data as Record<string, string>);
+
+      setShowModal(false);
+      await fetchVendors();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update vendor.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const vendorStatusColors: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    SUSPENDED: 'bg-red-100 text-red-800',
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-sm text-primary/60">{vendors.length} vendors total</p>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+          </div>
+        ) : vendors.length === 0 ? (
+          <div className="p-12 text-center">
+            <Store className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No vendors yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Business Name</th>
+                  <th className="px-6 py-3">Owner</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Products</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {vendors.map((vendor) => (
+                  <tr key={vendor.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-primary">
+                      {vendor.businessName}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {vendor.user?.name || vendor.user?.email || vendor.userId.slice(0, 8) + '...'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          vendorStatusColors[vendor.status] || 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {vendor.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {vendor.products?.length ?? '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => openEdit(vendor)}
+                        className="text-primary/50 hover:text-primary transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Vendor Edit Modal */}
+      {showModal && editingVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-primary">Edit Vendor</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-primary/40 hover:text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Business Name */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Business Name
+                </label>
+                <input
+                  type="text"
+                  value={formBusinessName}
+                  onChange={(e) => setFormBusinessName(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={formSlug}
+                  onChange={(e) => setFormSlug(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Status</label>
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value)}
+                  className="input-field w-full"
+                >
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="SUSPENDED">Suspended</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Description</label>
+                <textarea
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="input-field w-full h-20 resize-y"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Address</label>
+                <input
+                  type="text"
+                  value={formAddress}
+                  onChange={(e) => setFormAddress(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+
+              {/* Phone & Website row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">Website</label>
+                  <input
+                    type="text"
+                    value={formWebsite}
+                    onChange={(e) => setFormWebsite(e.target.value)}
+                    className="input-field w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+              <button
+                onClick={() => setShowModal(false)}
+                className="btn-outline"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="btn-primary flex items-center gap-2"
+                disabled={saving}
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Update Vendor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

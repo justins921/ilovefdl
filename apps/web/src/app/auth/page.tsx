@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, User as UserIcon, ArrowRight, Heart, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function AuthPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,10 +32,8 @@ export default function AuthPage() {
 
       const { token, user } = res.data;
 
-      // Store auth
-      localStorage.setItem('ilovefdl_token', token);
-      localStorage.setItem('ilovefdl_user', JSON.stringify(user));
-      api.setToken(token);
+      // Store auth via context (persists to localStorage + sets api token)
+      login(token, user);
 
       // Redirect based on role
       if (user.role === 'ADMIN') {
