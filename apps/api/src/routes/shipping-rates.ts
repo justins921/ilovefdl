@@ -1,6 +1,17 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 
 const router = Router();
+
+const shippingRateRequestSchema = z.object({
+  vendorId: z.string().min(1),
+  weight: z.number().positive('weight must be a positive number (in ounces)'),
+  destination: z.object({
+    state: z.string().min(1),
+    postalCode: z.string().min(1),
+    country: z.string().min(1),
+  }),
+});
 
 interface ShippingRate {
   carrier: string;
@@ -12,22 +23,13 @@ interface ShippingRate {
 // POST /shipping-rates/rates — calculate shipping rates based on weight
 router.post('/rates', (req: Request, res: Response) => {
   try {
-    const { vendorId, weight, destination } = req.body;
-
-    if (!vendorId || !weight || !destination) {
-      res.status(400).json({ error: 'vendorId, weight, and destination are required' });
+    const parsed = shippingRateRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
       return;
     }
 
-    if (typeof weight !== 'number' || weight <= 0) {
-      res.status(400).json({ error: 'weight must be a positive number (in ounces)' });
-      return;
-    }
-
-    if (!destination.state || !destination.postalCode || !destination.country) {
-      res.status(400).json({ error: 'destination must include state, postalCode, and country' });
-      return;
-    }
+    const { weight } = parsed.data;
 
     let rates: ShippingRate[];
 

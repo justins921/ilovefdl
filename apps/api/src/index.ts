@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { authMiddleware } from './middleware/auth';
-import { securityHeaders, apiRateLimit, authRateLimit } from './middleware/security';
+import { securityHeaders, apiRateLimit, authRateLimit, strictRateLimit } from './middleware/security';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -101,7 +101,7 @@ app.use('/specials', specialRoutes);
 app.use('/push', notificationRoutes);
 app.use('/integrations', integrationRoutes);
 app.use('/reviews', reviewRoutes);
-app.use('/coupons', couponRoutes);
+app.use('/coupons', strictRateLimit, couponRoutes);
 app.use('/shipping', shippingRoutes);
 app.use('/wishlist', wishlistRoutes);
 app.use('/addresses', addressRoutes);
@@ -110,7 +110,7 @@ app.use('/refunds', refundRoutes);
 app.use('/analytics', analyticsRoutes);
 app.use('/admin', adminRoutes);
 app.use('/abandoned-carts', abandonedCartRoutes);
-app.use('/gift-cards', giftCardRoutes);
+app.use('/gift-cards', strictRateLimit, giftCardRoutes);
 app.use('/tax', taxRoutes);
 app.use('/payment-methods', paymentMethodRoutes);
 app.use('/loyalty', loyaltyRoutes);
