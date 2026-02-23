@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from '@ilovefdl/shared';
+import { loginSchema, registerSchema, registerVendorSchema, forgotPasswordSchema, resetPasswordSchema } from '@ilovefdl/shared';
 import prisma from '../utils/prisma';
 import { signToken, requireAuth } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../utils/email';
@@ -57,6 +57,81 @@ router.post('/register', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+/**
+ * POST /auth/register-vendor
+ * Create a new user account and vendor profile in one step
+ */
+router.post('/register-vendor', async (req: Request, res: Response) => {
+  try {
+    const parsed = registerVendorSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+
+    const { email, password, name, businessName, slug, description, phone, address, website } = parsed.data;
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      res.status(409).json({ error: 'An account with this email already exists' });
+      return;
+    }
+
+    // Check if slug is taken
+    const existingSlug = await prisma.vendor.findUnique({ where: { slug } });
+    if (existingSlug) {
+      res.status(409).json({ error: 'This store URL is already taken' });
+      return;
+    }
+
+    // Create user + vendor in a transaction
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: { email, passwordHash, name },
+      });
+
+      await tx.vendor.create({
+        data: {
+          userId: newUser.id,
+          businessName,
+          slug,
+          description: description || undefined,
+          phone: phone || undefined,
+          address: address || undefined,
+          website: website || undefined,
+        },
+      });
+
+      return newUser;
+    });
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    res.status(201).json({
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Register vendor error:', error);
+    res.status(500).json({ error: 'Failed to create vendor account' });
   }
 });
 

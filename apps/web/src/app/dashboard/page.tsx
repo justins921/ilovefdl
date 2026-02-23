@@ -100,7 +100,7 @@ export default function VendorDashboardPage() {
             You don&apos;t have a vendor profile yet. Apply to become a vendor
             on the I Love FDL marketplace.
           </p>
-          <Link href="/auth" className="btn-primary">
+          <Link href="/auth/vendor" className="btn-primary">
             Apply to Sell
             <ArrowRight className="w-4 h-4 ml-2" />
           </Link>

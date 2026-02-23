@@ -40,6 +40,7 @@ import type {
   Campaign,
 } from './types';
 import type {
+  RegisterVendorInput,
   CreateVendorInput,
   UpdateVendorInput,
   CreateProductInput,
@@ -209,6 +210,11 @@ export class ApiClient {
   /** Create a new account */
   async register(email: string, password: string, name: string): Promise<ApiResponse<LoginResponse>> {
     return this.post<ApiResponse<LoginResponse>>('/auth/register', { email, password, name });
+  }
+
+  /** Register as a vendor (creates account + vendor profile) */
+  async registerVendor(data: RegisterVendorInput): Promise<ApiResponse<LoginResponse>> {
+    return this.post<ApiResponse<LoginResponse>>('/auth/register-vendor', data);
   }
 
   /** Get the current authenticated user */
