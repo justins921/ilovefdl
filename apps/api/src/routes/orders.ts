@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { createCheckoutSchema } from '@ilovefdl/shared';
+import crypto from 'crypto';
+import { createCheckoutSchema, createMultiVendorCheckoutSchema } from '@ilovefdl/shared';
 import prisma from '../utils/prisma';
 import stripe from '../utils/stripe';
 import { requireAuth, requireRole } from '../middleware/auth';
@@ -148,6 +149,181 @@ router.post('/checkout/session', requireAuth, async (req: Request, res: Response
 });
 
 /**
+ * POST /checkout/multi
+ * Create a multi-vendor Stripe Checkout session.
+ * Groups items by vendor, calculates commission per vendor, creates one
+ * Stripe session for all items and one Order record per vendor.
+ */
+router.post('/checkout/multi', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parsed = createMultiVendorCheckoutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+
+    const { items, shippingAddress, notes } = parsed.data;
+
+    if (!stripe) {
+      res.status(503).json({ error: 'Stripe is not configured' });
+      return;
+    }
+
+    // Fetch all products by ID (must be active)
+    const productIds = items.map((item) => item.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true },
+    });
+
+    if (products.length !== items.length) {
+      res.status(400).json({ error: 'One or more products are unavailable' });
+      return;
+    }
+
+    // Group products by vendorId
+    const vendorGroups = new Map<string, typeof items>();
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId)!;
+      const group = vendorGroups.get(product.vendorId) || [];
+      group.push(item);
+      vendorGroups.set(product.vendorId, group);
+    }
+
+    // Fetch and validate all vendors
+    const vendorIds = Array.from(vendorGroups.keys());
+    const vendors = await prisma.vendor.findMany({
+      where: { id: { in: vendorIds } },
+    });
+
+    if (vendors.length !== vendorIds.length) {
+      res.status(400).json({ error: 'One or more vendors not found' });
+      return;
+    }
+
+    // Verify each vendor is APPROVED and Stripe-onboarded
+    for (const vendor of vendors) {
+      if (vendor.status !== 'APPROVED') {
+        res.status(400).json({ error: `Vendor "${vendor.businessName}" is not approved for sales` });
+        return;
+      }
+      if (!vendor.stripeAccountId || !vendor.stripeOnboarded) {
+        res.status(400).json({ error: `Vendor "${vendor.businessName}" has not completed Stripe setup` });
+        return;
+      }
+    }
+
+    // Calculate commission per vendor
+    const vendorCommissions = new Map<string, { commissionBaseAmount: number; commissionAmount: number; vendorNetAmount: number }>();
+    let totalApplicationFee = 0;
+
+    for (const vendor of vendors) {
+      const vendorItems = vendorGroups.get(vendor.id)!;
+      const commissionItems = vendorItems.map((item) => {
+        const product = products.find((p) => p.id === item.productId)!;
+        return { price: product.price, quantity: item.quantity };
+      });
+
+      const commission = calculateCommission(commissionItems, vendor.commissionRate);
+      vendorCommissions.set(vendor.id, commission);
+      totalApplicationFee += commission.commissionAmount;
+    }
+
+    // Generate a unique orderGroupId
+    const orderGroupId = crypto.randomUUID();
+
+    // Build Stripe Checkout line items for ALL products (flat list)
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item) => {
+      const product = products.find((p) => p.id === item.productId)!;
+      return {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: product.name,
+            images: product.images.length > 0 ? [product.images[0]] : undefined,
+          },
+          unit_amount: Math.round(product.price * 100),
+        },
+        quantity: item.quantity,
+      };
+    });
+
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
+    // Create a SINGLE Stripe Checkout session (no transfer_data -- transfers happen via webhook)
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: lineItems,
+      payment_intent_data: {
+        application_fee_amount: Math.round(totalApplicationFee * 100),
+      },
+      success_url: `${appUrl}/orders/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/orders/cancel`,
+      customer_email: req.user!.email,
+      metadata: {
+        userId: req.user!.id,
+        orderGroupId,
+        vendorIds: vendorIds.join(','),
+      },
+    });
+
+    // Create one Order record per vendor
+    const orderIds: string[] = [];
+    let isFirst = true;
+
+    for (const vendor of vendors) {
+      const vendorItems = vendorGroups.get(vendor.id)!;
+      const commission = vendorCommissions.get(vendor.id)!;
+
+      const order = await prisma.order.create({
+        data: {
+          userId: req.user!.id,
+          vendorId: vendor.id,
+          status: 'PENDING',
+          subtotal: commission.commissionBaseAmount,
+          total: commission.commissionBaseAmount,
+          commissionBaseAmount: commission.commissionBaseAmount,
+          commissionRate: vendor.commissionRate,
+          commissionAmount: commission.commissionAmount,
+          vendorNetAmount: commission.vendorNetAmount,
+          orderGroupId,
+          // Only the FIRST order gets the stripeSessionId (unique constraint)
+          stripeSessionId: isFirst ? session.id : null,
+          shippingAddress: shippingAddress || undefined,
+          notes,
+          items: {
+            create: vendorItems.map((item) => {
+              const product = products.find((p) => p.id === item.productId)!;
+              return {
+                productId: product.id,
+                quantity: item.quantity,
+                unitPrice: product.price,
+                total: product.price * item.quantity,
+              };
+            }),
+          },
+        },
+        include: { items: true },
+      });
+
+      orderIds.push(order.id);
+      isFirst = false;
+    }
+
+    res.json({
+      data: {
+        sessionId: session.id,
+        sessionUrl: session.url,
+        orderGroupId,
+        orderIds,
+      },
+    });
+  } catch (error) {
+    console.error('Multi-vendor checkout error:', error);
+    res.status(500).json({ error: 'Failed to create multi-vendor checkout session' });
+  }
+});
+
+/**
  * GET /orders
  * Get user's orders (auth) or all orders (admin)
  */
@@ -251,14 +427,54 @@ router.post('/webhooks/stripe', async (req: Request, res: Response) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        const orderGroupId = session.metadata?.orderGroupId;
 
-        await prisma.order.update({
-          where: { stripeSessionId: session.id },
-          data: {
-            status: 'PAID',
-            stripePaymentIntent: session.payment_intent as string,
-          },
-        });
+        if (orderGroupId) {
+          // Multi-vendor order: update ALL orders in the group to PAID
+          const groupOrders = await prisma.order.findMany({
+            where: { orderGroupId },
+            include: {
+              vendor: {
+                select: { id: true, stripeAccountId: true, businessName: true },
+              },
+            },
+          });
+
+          await prisma.order.updateMany({
+            where: { orderGroupId },
+            data: {
+              status: 'PAID',
+              stripePaymentIntent: session.payment_intent as string,
+            },
+          });
+
+          // Create Stripe transfers for each vendor
+          for (const order of groupOrders) {
+            try {
+              await stripe!.transfers.create({
+                amount: Math.round(order.vendorNetAmount * 100),
+                currency: 'usd',
+                destination: order.vendor.stripeAccountId!,
+                transfer_group: orderGroupId,
+                source_transaction: session.payment_intent as string || undefined,
+              });
+            } catch (transferError) {
+              console.error(
+                `Failed to create transfer for vendor "${order.vendor.businessName}" (order ${order.id}):`,
+                transferError,
+              );
+            }
+          }
+        } else {
+          // Single-vendor order: existing behavior
+          await prisma.order.update({
+            where: { stripeSessionId: session.id },
+            data: {
+              status: 'PAID',
+              stripePaymentIntent: session.payment_intent as string,
+            },
+          });
+        }
         break;
       }
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ShoppingCart,
   Trash2,
@@ -13,66 +13,15 @@ import {
   Shield,
 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
-import api from '@/lib/api';
-
-interface CartItem {
-  productId: string;
-  name: string;
-  price: number;
-  image: string | null;
-  vendorId: string;
-  vendorName: string;
-  quantity: number;
-  slug: string;
-}
+import { useCart } from '@/components/CartProvider';
 
 export default function CartPage() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('ilovefdl_cart');
-    if (stored) {
-      try {
-        setCart(JSON.parse(stored));
-      } catch {
-        setCart([]);
-      }
-    }
-  }, []);
-
-  const updateCart = (newCart: CartItem[]) => {
-    setCart(newCart);
-    localStorage.setItem('ilovefdl_cart', JSON.stringify(newCart));
-  };
-
-  const updateQuantity = (productId: string, delta: number) => {
-    const newCart = cart
-      .map((item) =>
-        item.productId === productId
-          ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-          : item
-      )
-      .filter((item) => item.quantity > 0);
-    updateCart(newCart);
-  };
-
-  const removeItem = (productId: string) => {
-    updateCart(cart.filter((item) => item.productId !== productId));
-  };
-
-  const clearCart = () => {
-    updateCart([]);
-  };
-
-  const subtotal = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const router = useRouter();
+  const { items: cart, itemCount, subtotal, updateQuantity, removeItem, clearCart } = useCart();
 
   // Group items by vendor
   const itemsByVendor = cart.reduce<
-    Record<string, { vendorName: string; items: CartItem[] }>
+    Record<string, { vendorName: string; items: typeof cart }>
   >((acc, item) => {
     if (!acc[item.vendorId]) {
       acc[item.vendorId] = { vendorName: item.vendorName, items: [] };
@@ -81,26 +30,8 @@ export default function CartPage() {
     return acc;
   }, {});
 
-  const handleCheckout = async () => {
-    setLoading(true);
-    try {
-      // Create checkout sessions grouped by vendor
-      for (const [vendorId, group] of Object.entries(itemsByVendor)) {
-        const items = group.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        }));
-        const res = await api.createCheckoutSession(vendorId, items);
-        if (res.data.url) {
-          window.location.href = res.data.url;
-          return;
-        }
-      }
-    } catch (err) {
-      alert('Please sign in to checkout.');
-    } finally {
-      setLoading(false);
-    }
+  const handleCheckout = () => {
+    router.push('/checkout');
   };
 
   if (cart.length === 0) {
@@ -134,11 +65,7 @@ export default function CartPage() {
               Shopping Cart
             </h1>
             <p className="text-primary/60">
-              {cart.reduce((sum, item) => sum + item.quantity, 0)} item
-              {cart.reduce((sum, item) => sum + item.quantity, 0) !== 1
-                ? 's'
-                : ''}{' '}
-              in your cart
+              {itemCount} item{itemCount !== 1 ? 's' : ''} in your cart
             </p>
           </div>
           <button
@@ -271,17 +198,10 @@ export default function CartPage() {
 
               <button
                 onClick={handleCheckout}
-                disabled={loading}
-                className="w-full btn-primary py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full btn-primary py-4 text-lg"
               >
-                {loading ? (
-                  'Processing...'
-                ) : (
-                  <>
-                    Checkout
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
-                )}
+                Checkout
+                <ArrowRight className="w-5 h-5 ml-2" />
               </button>
 
               <div className="flex items-center justify-center gap-2 text-xs text-primary/40 mt-4">

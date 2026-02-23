@@ -9,7 +9,7 @@ export const checkoutItemSchema = z.object({
     .min(1, 'Quantity must be at least 1'),
 });
 
-const shippingAddressSchema = z.object({
+export const shippingAddressSchema = z.object({
   line1: z.string().min(1, 'Address line 1 is required'),
   line2: z.string().optional(),
   city: z.string().min(1, 'City is required'),
@@ -33,7 +33,14 @@ export const updateOrderStatusSchema = z.object({
   status: z.nativeEnum(OrderStatus),
 });
 
+export const createMultiVendorCheckoutSchema = z.object({
+  items: z.array(checkoutItemSchema).min(1, 'At least one item is required'),
+  shippingAddress: shippingAddressSchema.optional(),
+  notes: z.string().max(1000).optional(),
+});
+
 export type CheckoutItem = z.infer<typeof checkoutItemSchema>;
 export type CreateCheckoutInput = z.infer<typeof createCheckoutSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+export type CreateMultiVendorCheckoutInput = z.infer<typeof createMultiVendorCheckoutSchema>;
