@@ -264,6 +264,18 @@ export default function VendorDashboardPage() {
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
                 </Link>
                 <Link
+                  href="/dashboard/integrations"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <ArrowRight className="w-5 h-5 text-teal rotate-90" />
+                    <span className="text-sm font-medium text-primary">
+                      Integrations
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
                   href="/marketplace"
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
                 >

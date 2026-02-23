@@ -12,6 +12,7 @@ import blogRoutes from './routes/blog';
 import barRoutes from './routes/bars';
 import specialRoutes from './routes/specials';
 import notificationRoutes from './routes/notifications';
+import integrationRoutes from './routes/integrations';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -73,6 +74,7 @@ app.use('/posts', blogRoutes);
 app.use('/bars', barRoutes);
 app.use('/specials', specialRoutes);
 app.use('/push', notificationRoutes);
+app.use('/integrations', integrationRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {

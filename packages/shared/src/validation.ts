@@ -97,3 +97,17 @@ export type {
   UpdatePreferencesInput,
   UpdateNotificationPreferenceInput,
 } from './schemas/notification';
+
+// Integrations
+export {
+  connectPlatformSchema,
+  importProductsSchema,
+  syncInventorySchema,
+  disconnectPlatformSchema,
+} from './schemas/integration';
+export type {
+  ConnectPlatformInput,
+  ImportProductsInput,
+  SyncInventoryInput,
+  DisconnectPlatformInput,
+} from './schemas/integration';

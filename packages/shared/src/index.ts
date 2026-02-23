@@ -43,6 +43,13 @@ export type {
   // Checkout types
   CheckoutLineItem,
   CheckoutSession,
+
+  // Integration / Sync types
+  SyncDirection,
+  ExternalProduct,
+  ImportResult,
+  SyncResult,
+  ConnectionStatus,
 } from './types';
 
 // ─── Validation Schemas ─────────────────────────────────
@@ -54,6 +61,7 @@ export * from './schemas/blog';
 export * from './schemas/bar';
 export * from './schemas/special';
 export * from './schemas/notification';
+export * from './schemas/integration';
 
 // ─── API Client ─────────────────────────────────────────
 export { ApiClient, ApiError } from './api-client';

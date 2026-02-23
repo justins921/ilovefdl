@@ -337,3 +337,42 @@ export interface CheckoutSession {
   sessionId: string;
   url: string;
 }
+
+// ─── INTEGRATION / SYNC TYPES ──────────────────────────
+
+export type SyncDirection = 'pull' | 'push' | 'both';
+
+export interface ExternalProduct {
+  externalId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  images: string[];
+  inventory: number;
+  sku: string | null;
+  categoryTags: string[];
+  platform: ExternalPlatform;
+}
+
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export interface SyncResult {
+  synced: number;
+  errors: string[];
+  direction: SyncDirection;
+  timestamp: string;
+}
+
+export interface ConnectionStatus {
+  platform: ExternalPlatform;
+  isConnected: boolean;
+  shopDomain: string | null;
+  lastSyncAt: string | null;
+  productCount: number;
+}

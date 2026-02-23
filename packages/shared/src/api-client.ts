@@ -16,6 +16,11 @@ import type {
   Special,
   PushToken,
   NotificationPreference,
+  ConnectionStatus,
+  ExternalProduct,
+  ImportResult,
+  SyncResult,
+  SyncDirection,
 } from './types';
 import type {
   CreateVendorInput,
@@ -31,6 +36,10 @@ import type {
   UpdateSpecialInput,
   RegisterPushTokenInput,
   UpdateNotificationPreferenceInput,
+  ConnectPlatformInput,
+  ImportProductsInput,
+  SyncInventoryInput,
+  DisconnectPlatformInput,
 } from './validation';
 
 // ─── ERROR CLASS ────────────────────────────────────────
@@ -356,5 +365,43 @@ export class ApiClient {
   /** Get notification preferences for the current user */
   async getNotificationPreferences(): Promise<ApiResponse<NotificationPreference>> {
     return this.get<ApiResponse<NotificationPreference>>('/notification-preferences');
+  }
+
+  // ─── INTEGRATIONS ──────────────────────────────────────
+
+  /** Get connection status for all external platforms */
+  async getIntegrationConnections(): Promise<ApiResponse<ConnectionStatus[]>> {
+    return this.get<ApiResponse<ConnectionStatus[]>>('/integrations/connections');
+  }
+
+  /** Initiate or complete a platform connection (OAuth) */
+  async connectPlatform(
+    data: ConnectPlatformInput,
+  ): Promise<ApiResponse<{ authUrl?: string; connected?: boolean; platform: string }>> {
+    return this.post('/integrations/connect', data);
+  }
+
+  /** Disconnect an external platform */
+  async disconnectPlatform(
+    data: DisconnectPlatformInput,
+  ): Promise<ApiResponse<{ disconnected: boolean; platform: string }>> {
+    return this.post('/integrations/disconnect', data);
+  }
+
+  /** Fetch products from an external platform for preview before import */
+  async getExternalProducts(
+    platform: string,
+  ): Promise<ApiResponse<(ExternalProduct & { alreadyImported: boolean })[]>> {
+    return this.get(`/integrations/products/${platform.toLowerCase()}`);
+  }
+
+  /** Import products from an external platform */
+  async importProducts(data: ImportProductsInput): Promise<ApiResponse<ImportResult>> {
+    return this.post('/integrations/import', data);
+  }
+
+  /** Sync inventory between local and external platform */
+  async syncInventory(data: SyncInventoryInput): Promise<ApiResponse<SyncResult>> {
+    return this.post('/integrations/sync', data);
   }
 }
