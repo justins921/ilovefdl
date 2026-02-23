@@ -312,6 +312,7 @@ function BlogPostsSection() {
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<PostStatus | 'ALL'>('ALL');
 
   // Form state
   const [formTitle, setFormTitle] = useState('');
@@ -319,15 +320,19 @@ function BlogPostsSection() {
   const [formContent, setFormContent] = useState('');
   const [formExcerpt, setFormExcerpt] = useState('');
   const [formCategory, setFormCategory] = useState<PostCategory>(PostCategory.UNCATEGORIZED);
-  const [formStatus, setFormStatus] = useState<PostStatus>(PostStatus.DRAFT);
   const [formFeaturedImage, setFormFeaturedImage] = useState('');
   const [formTags, setFormTags] = useState('');
+  const [formScheduledAt, setFormScheduledAt] = useState('');
 
-  const fetchPosts = useCallback(async () => {
+  const fetchPosts = useCallback(async (filter: PostStatus | 'ALL') => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.getPosts({ limit: 50 });
+      const params: { limit: number; status?: PostStatus } = { limit: 50 };
+      if (filter !== 'ALL') {
+        params.status = filter;
+      }
+      const res = await api.getPosts(params);
       setPosts(res.data);
     } catch {
       setError('Failed to load blog posts.');
@@ -337,8 +342,8 @@ function BlogPostsSection() {
   }, []);
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    fetchPosts(statusFilter);
+  }, [fetchPosts, statusFilter]);
 
   function resetForm() {
     setFormTitle('');
@@ -346,9 +351,9 @@ function BlogPostsSection() {
     setFormContent('');
     setFormExcerpt('');
     setFormCategory(PostCategory.UNCATEGORIZED);
-    setFormStatus(PostStatus.DRAFT);
     setFormFeaturedImage('');
     setFormTags('');
+    setFormScheduledAt('');
   }
 
   function openCreate() {
@@ -364,29 +369,37 @@ function BlogPostsSection() {
     setFormContent(post.content);
     setFormExcerpt(post.excerpt ?? '');
     setFormCategory(post.category);
-    setFormStatus(post.status);
     setFormFeaturedImage(post.featuredImage ?? '');
     setFormTags(post.tags.join(', '));
+    setFormScheduledAt(
+      post.scheduledAt
+        ? new Date(post.scheduledAt).toISOString().slice(0, 16)
+        : ''
+    );
     setShowModal(true);
   }
 
-  async function handleSave() {
+  async function handleSave(targetStatus: PostStatus) {
     setSaving(true);
     setError(null);
     try {
-      const data = {
+      const data: Record<string, unknown> = {
         title: formTitle,
         slug: formSlug,
         content: formContent,
         excerpt: formExcerpt || undefined,
         category: formCategory,
-        status: formStatus,
+        status: targetStatus,
         featuredImage: formFeaturedImage || undefined,
         tags: formTags
           .split(',')
           .map((t) => t.trim())
           .filter(Boolean),
       };
+
+      if (targetStatus === PostStatus.SCHEDULED && formScheduledAt) {
+        data.scheduledAt = new Date(formScheduledAt).toISOString();
+      }
 
       if (editingPost) {
         await api.updatePost(editingPost.id, data);
@@ -396,7 +409,7 @@ function BlogPostsSection() {
 
       setShowModal(false);
       resetForm();
-      await fetchPosts();
+      await fetchPosts(statusFilter);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save post.');
     } finally {
@@ -410,15 +423,45 @@ function BlogPostsSection() {
     SCHEDULED: 'bg-blue-100 text-blue-800',
   };
 
+  const postStatusLabels: Record<string, string> = {
+    DRAFT: 'Draft',
+    PUBLISHED: 'Published',
+    SCHEDULED: 'Scheduled',
+  };
+
+  const filterTabs: { key: PostStatus | 'ALL'; label: string }[] = [
+    { key: 'ALL', label: 'All' },
+    { key: PostStatus.DRAFT, label: 'Drafts' },
+    { key: PostStatus.SCHEDULED, label: 'Scheduled' },
+    { key: PostStatus.PUBLISHED, label: 'Published' },
+  ];
+
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-primary/60">{posts.length} posts total</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-primary/60">{posts.length} posts</p>
         <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           New Post
         </button>
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-1 mb-4 p-1 bg-light rounded-lg w-fit">
+        {filterTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setStatusFilter(tab.key)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              statusFilter === tab.key
+                ? 'bg-white text-primary shadow-sm'
+                : 'text-primary/50 hover:text-primary/70'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -437,7 +480,11 @@ function BlogPostsSection() {
         ) : posts.length === 0 ? (
           <div className="p-12 text-center">
             <Newspaper className="w-10 h-10 text-primary/20 mx-auto mb-3" />
-            <p className="text-primary/60 text-sm">No blog posts yet.</p>
+            <p className="text-primary/60 text-sm">
+              {statusFilter === 'ALL'
+                ? 'No blog posts yet.'
+                : `No ${statusFilter.toLowerCase()} posts.`}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -467,14 +514,14 @@ function BlogPostsSection() {
                           postStatusColors[post.status] || 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {post.status}
+                        {postStatusLabels[post.status] || post.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-primary/60">
                       {post.author?.name || post.author?.email || 'Unknown'}
                     </td>
                     <td className="px-6 py-4 text-sm text-primary/60">
-                      {formatDate(post.createdAt)}
+                      {formatDate(post.publishedAt ?? post.createdAt)}
                     </td>
                     <td className="px-6 py-4">
                       <button
@@ -561,36 +608,36 @@ function BlogPostsSection() {
                 />
               </div>
 
-              {/* Category & Status row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">Category</label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value as PostCategory)}
-                    className="input-field w-full"
-                  >
-                    {Object.values(PostCategory).map((cat) => (
-                      <option key={cat} value={cat}>
-                        {formatCategoryName(cat)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">Status</label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as PostStatus)}
-                    className="input-field w-full"
-                  >
-                    {Object.values(PostStatus).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Category</label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value as PostCategory)}
+                  className="input-field w-full"
+                >
+                  {Object.values(PostCategory).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {formatCategoryName(cat)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Schedule date (shown for scheduling) */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Schedule For (optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formScheduledAt}
+                  onChange={(e) => setFormScheduledAt(e.target.value)}
+                  className="input-field w-full"
+                />
+                <p className="text-xs text-primary/40 mt-1">
+                  Set a date to schedule this post for future publishing.
+                </p>
               </div>
 
               {/* Featured Image */}
@@ -622,8 +669,8 @@ function BlogPostsSection() {
               </div>
             </div>
 
-            {/* Buttons */}
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+            {/* Action buttons */}
+            <div className="flex items-center justify-between gap-3 mt-6 pt-4 border-t border-light">
               <button
                 onClick={() => setShowModal(false)}
                 className="btn-outline"
@@ -631,14 +678,37 @@ function BlogPostsSection() {
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                className="btn-primary flex items-center gap-2"
-                disabled={saving}
-              >
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {editingPost ? 'Update Post' : 'Create Post'}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Save as Draft */}
+                <button
+                  onClick={() => handleSave(PostStatus.DRAFT)}
+                  className="btn-outline flex items-center gap-2"
+                  disabled={saving}
+                >
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Save Draft
+                </button>
+                {/* Schedule (only if a date is set) */}
+                {formScheduledAt && (
+                  <button
+                    onClick={() => handleSave(PostStatus.SCHEDULED)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    disabled={saving}
+                  >
+                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Schedule
+                  </button>
+                )}
+                {/* Publish Now */}
+                <button
+                  onClick={() => handleSave(PostStatus.PUBLISHED)}
+                  className="btn-primary flex items-center gap-2"
+                  disabled={saving}
+                >
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Publish Now
+                </button>
+              </div>
             </div>
           </div>
         </div>

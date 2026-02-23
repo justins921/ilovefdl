@@ -23,12 +23,21 @@ router.get('/', async (req: Request, res: Response) => {
 
     const where: Prisma.BlogPostWhereInput = {};
 
-    // Public requests only see published posts; admin/editor can filter by status
+    // Admin/editor users see all statuses by default; public users see only PUBLISHED
+    const isEditorOrAdmin =
+      req.user && ['EDITOR', 'ADMIN'].includes(req.user.role);
+
     if (status) {
-      where.status = status;
-    } else {
+      // If a non-admin requests DRAFT or SCHEDULED, block it
+      if (!isEditorOrAdmin && status !== 'PUBLISHED') {
+        where.status = 'PUBLISHED';
+      } else {
+        where.status = status;
+      }
+    } else if (!isEditorOrAdmin) {
       where.status = 'PUBLISHED';
     }
+    // else: admin/editor with no status filter → no status constraint (show all)
 
     if (category) {
       where.category = category;
@@ -56,7 +65,7 @@ router.get('/', async (req: Request, res: Response) => {
         },
         skip,
         take: limit,
-        orderBy: { publishedAt: 'desc' },
+        orderBy: [{ updatedAt: 'desc' }],
       }),
       prisma.blogPost.count({ where }),
     ]);
@@ -92,6 +101,16 @@ router.get('/:slug', async (req: Request, res: Response) => {
     if (!post) {
       res.status(404).json({ error: 'Post not found' });
       return;
+    }
+
+    // Non-published posts are only visible to admin/editor users
+    if (post.status !== 'PUBLISHED') {
+      const isEditorOrAdmin =
+        req.user && ['EDITOR', 'ADMIN'].includes(req.user.role);
+      if (!isEditorOrAdmin) {
+        res.status(404).json({ error: 'Post not found' });
+        return;
+      }
     }
 
     res.json({ data: post });
