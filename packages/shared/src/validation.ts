@@ -139,3 +139,35 @@ export type { CreateConversationInput, SendMessageInput } from './schemas/messag
 // Refund
 export { createRefundSchema, updateRefundSchema } from './schemas/refund';
 export type { CreateRefundInput, UpdateRefundInput } from './schemas/refund';
+
+// Abandoned Cart
+export { saveAbandonedCartSchema, recoverCartSchema } from './schemas/abandoned-cart';
+export type { SaveAbandonedCartInput, RecoverCartInput } from './schemas/abandoned-cart';
+
+// Gift Cards
+export { createGiftCardSchema, redeemGiftCardSchema, checkGiftCardBalanceSchema } from './schemas/gift-card';
+export type { CreateGiftCardInput, RedeemGiftCardInput, CheckGiftCardBalanceInput } from './schemas/gift-card';
+
+// Tax Rates
+export { createTaxRateSchema, updateTaxRateSchema, calculateTaxSchema } from './schemas/tax-rate';
+export type { CreateTaxRateInput, UpdateTaxRateInput, CalculateTaxInput } from './schemas/tax-rate';
+
+// Payment Methods
+export { addPaymentMethodSchema, setDefaultPaymentMethodSchema } from './schemas/payment-method';
+export type { AddPaymentMethodInput, SetDefaultPaymentMethodInput } from './schemas/payment-method';
+
+// Loyalty
+export { redeemPointsSchema, addBonusPointsSchema } from './schemas/loyalty';
+export type { RedeemPointsInput, AddBonusPointsInput } from './schemas/loyalty';
+
+// Subscriptions
+export { createSubscriptionSchema, updateSubscriptionSchema } from './schemas/subscription';
+export type { CreateSubscriptionInput, UpdateSubscriptionInput } from './schemas/subscription';
+
+// Campaigns
+export { createCampaignSchema, updateCampaignSchema } from './schemas/campaign';
+export type { CreateCampaignInput, UpdateCampaignInput } from './schemas/campaign';
+
+// Currency
+export { convertCurrencySchema, SUPPORTED_CURRENCIES } from './schemas/currency';
+export type { ConvertCurrencyInput } from './schemas/currency';

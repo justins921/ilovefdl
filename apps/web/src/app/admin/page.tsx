@@ -462,7 +462,7 @@ function BlogPostsSection() {
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-4 p-1 bg-light rounded-lg w-fit">
+      <div className="flex flex-wrap gap-1 mb-4 p-1 bg-light rounded-lg">
         {filterTabs.map((tab) => (
           <button
             key={tab.key}
@@ -684,7 +684,7 @@ function BlogPostsSection() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center justify-between gap-3 mt-6 pt-4 border-t border-light">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-6 pt-4 border-t border-light">
               <button
                 onClick={() => setShowModal(false)}
                 className="btn-outline"
@@ -692,7 +692,7 @@ function BlogPostsSection() {
               >
                 Cancel
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 {/* Save as Draft */}
                 <button
                   onClick={() => handleSave(PostStatus.DRAFT)}
@@ -1107,7 +1107,7 @@ function BarsSection() {
                 </div>
 
                 {/* Time row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-primary mb-1">
                       Start Time (HH:MM)
@@ -1150,7 +1150,7 @@ function BarsSection() {
               </div>
 
               {/* Buttons */}
-              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
                 <button
                   onClick={() => setShowSpecialModal(false)}
                   className="btn-outline"
@@ -1341,7 +1341,7 @@ function BarsSection() {
               </div>
 
               {/* Phone & Website row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1">Phone</label>
                   <input
@@ -1366,7 +1366,7 @@ function BarsSection() {
             </div>
 
             {/* Buttons */}
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
               <button
                 onClick={() => setShowBarModal(false)}
                 className="btn-outline"
@@ -1660,7 +1660,7 @@ function ProductsSection() {
               </div>
 
               {/* Price row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1">Price ($)</label>
                   <input
@@ -1742,7 +1742,7 @@ function ProductsSection() {
             </div>
 
             {/* Buttons */}
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
               <button
                 onClick={() => setShowModal(false)}
                 className="btn-outline"
@@ -1999,7 +1999,7 @@ function VendorsSection() {
               </div>
 
               {/* Phone & Website row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1">Phone</label>
                   <input
@@ -2022,7 +2022,7 @@ function VendorsSection() {
             </div>
 
             {/* Buttons */}
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-6 pt-4 border-t border-light">
               <button
                 onClick={() => setShowModal(false)}
                 className="btn-outline"
@@ -2329,7 +2329,7 @@ function UsersAdminSection() {
 
   return (
     <>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         {roles.map((r) => (
           <button
             key={r}

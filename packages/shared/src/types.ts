@@ -78,6 +78,33 @@ export enum RefundStatus {
   PROCESSED = 'PROCESSED',
 }
 
+export enum GiftCardStatus {
+  ACTIVE = 'ACTIVE',
+  REDEEMED = 'REDEEMED',
+  EXPIRED = 'EXPIRED',
+  DISABLED = 'DISABLED',
+}
+
+export enum SubscriptionStatus {
+  ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum CampaignStatus {
+  DRAFT = 'DRAFT',
+  SCHEDULED = 'SCHEDULED',
+  SENDING = 'SENDING',
+  SENT = 'SENT',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum CampaignType {
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
+}
+
 // ─── INTERFACES ──────────────────────────────────────────
 
 export interface User {
@@ -151,6 +178,9 @@ export interface Product {
   lowStockThreshold: number;
   isActive: boolean;
   isFeatured: boolean;
+  isDigital: boolean;
+  digitalFiles: Array<{ name: string; url: string; size: number }> | null;
+  maxDownloads: number | null;
   externalPlatform: ExternalPlatform;
   externalId: string | null;
   seoTitle: string | null;
@@ -289,6 +319,11 @@ export interface Order {
   trackingCarrier: string | null;
   shippedAt: string | null;
   fulfilledAt: string | null;
+
+  currency: string;
+  exchangeRate: number;
+  giftCardCode: string | null;
+  giftCardAmount: number;
 
   shippingAddress: ShippingAddress | null;
   notes: string | null;
@@ -441,6 +476,158 @@ export interface NotificationPreference {
   categoryAlerts: Record<string, boolean> | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── ABANDONED CART ─────────────────────────────────────
+
+export interface AbandonedCart {
+  id: string;
+  userId: string | null;
+  email: string | null;
+  items: AbandonedCartItem[];
+  subtotal: number;
+  recoveryToken: string;
+  emailsSent: number;
+  lastEmailAt: string | null;
+  recoveredAt: string | null;
+  isRecovered: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  user?: User;
+}
+
+export interface AbandonedCartItem {
+  productId: string;
+  quantity: number;
+  price: number;
+  name: string;
+  image: string | null;
+}
+
+// ─── GIFT CARDS ─────────────────────────────────────────
+
+export interface GiftCard {
+  id: string;
+  code: string;
+  initialBalance: number;
+  currentBalance: number;
+  purchasedById: string | null;
+  recipientEmail: string | null;
+  recipientName: string | null;
+  message: string | null;
+  status: GiftCardStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+
+  purchasedBy?: User;
+  transactions?: GiftCardTransaction[];
+}
+
+export interface GiftCardTransaction {
+  id: string;
+  giftCardId: string;
+  orderId: string | null;
+  amount: number;
+  type: string; // 'purchase' | 'redemption' | 'refund'
+  createdAt: string;
+}
+
+// ─── TAX RATES ──────────────────────────────────────────
+
+export interface TaxRate {
+  id: string;
+  country: string;
+  state: string;
+  rate: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── PAYMENT METHODS ────────────────────────────────────
+
+export interface PaymentMethod {
+  id: string;
+  userId: string;
+  stripePaymentMethodId: string;
+  type: string;
+  last4: string;
+  brand: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── LOYALTY / REWARDS ──────────────────────────────────
+
+export interface LoyaltyAccount {
+  id: string;
+  userId: string;
+  points: number;
+  lifetimePoints: number;
+  tier: string; // BRONZE, SILVER, GOLD, PLATINUM
+  createdAt: string;
+  updatedAt: string;
+
+  transactions?: LoyaltyTransaction[];
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  accountId: string;
+  points: number;
+  type: string; // 'earn' | 'redeem' | 'expire' | 'bonus'
+  description: string;
+  orderId: string | null;
+  createdAt: string;
+}
+
+// ─── SUBSCRIPTIONS ──────────────────────────────────────
+
+export interface Subscription {
+  id: string;
+  userId: string;
+  productId: string;
+  vendorId: string;
+  quantity: number;
+  intervalDays: number;
+  price: number;
+  status: SubscriptionStatus;
+  nextDeliveryAt: string;
+  lastDeliveryAt: string | null;
+  stripeSubscriptionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+
+  product?: Product;
+  user?: User;
+}
+
+// ─── MARKETING CAMPAIGNS ────────────────────────────────
+
+export interface Campaign {
+  id: string;
+  vendorId: string | null;
+  name: string;
+  subject: string | null;
+  body: string;
+  type: CampaignType;
+  status: CampaignStatus;
+  audience: string;
+  sentCount: number;
+  openCount: number;
+  clickCount: number;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+
+  vendor?: Vendor;
 }
 
 // ─── SUPPORTING TYPES ───────────────────────────────────
