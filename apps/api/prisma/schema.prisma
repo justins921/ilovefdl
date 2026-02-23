@@ -118,6 +118,11 @@ model User {
   sentMessages           Message[]           @relation("SenderMessages")
   receivedMessages       Message[]           @relation("RecipientMessages")
   conversations          ConversationParticipant[]
+  abandonedCarts         AbandonedCart[]
+  giftCardsPurchased     GiftCard[]          @relation("GiftCardPurchaser")
+  paymentMethods         PaymentMethod[]
+  loyaltyAccount         LoyaltyAccount?
+  subscriptions          Subscription[]
 
   @@map("users")
 }
@@ -190,6 +195,7 @@ model Vendor {
   coupons           Coupon[]
   shippingProfiles  ShippingProfile[]
   reviews           Review[]
+  campaigns         Campaign[]
 
   @@map("vendors")
 }
@@ -254,6 +260,9 @@ model Product {
   isFeatured       Boolean          @default(false)
   externalPlatform ExternalPlatform @default(NATIVE)
   externalId       String?
+  isDigital        Boolean          @default(false)
+  digitalFiles     Json?            // Array of {name, url, size}
+  maxDownloads     Int?
   seoTitle         String?
   seoDescription   String?
   metadata         Json?
@@ -265,6 +274,7 @@ model Product {
   attributes    ProductAttribute[]
   reviews       Review[]
   wishlistItems WishlistItem[]
+  subscriptions Subscription[]
 
   @@index([vendorId])
   @@index([externalPlatform, externalId])
@@ -410,6 +420,11 @@ model Order {
   trackingCarrier      String?
   shippedAt            DateTime?
   fulfilledAt          DateTime?
+
+  currency             String      @default("USD")
+  exchangeRate         Float       @default(1.0)
+  giftCardCode         String?
+  giftCardAmount       Float       @default(0)
 
   shippingAddress      Json?
   notes                String?
@@ -572,6 +587,209 @@ model Special {
 
   @@index([barId, dayOfWeek])
   @@map("specials")
+}
+
+// ─── ABANDONED CARTS ────────────────────────────────────
+
+model AbandonedCart {
+  id            String    @id @default(cuid())
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email         String?
+  items         Json      // Array of {productId, quantity, price, name, image}
+  subtotal      Float
+  recoveryToken String    @unique @default(cuid())
+  emailsSent    Int       @default(0)
+  lastEmailAt   DateTime?
+  recoveredAt   DateTime?
+  isRecovered   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([email])
+  @@index([isRecovered])
+  @@map("abandoned_carts")
+}
+
+// ─── GIFT CARDS ─────────────────────────────────────────
+
+enum GiftCardStatus {
+  ACTIVE
+  REDEEMED
+  EXPIRED
+  DISABLED
+}
+
+model GiftCard {
+  id              String          @id @default(cuid())
+  code            String          @unique
+  initialBalance  Float
+  currentBalance  Float
+  purchasedById   String?
+  purchasedBy     User?           @relation("GiftCardPurchaser", fields: [purchasedById], references: [id], onDelete: SetNull)
+  recipientEmail  String?
+  recipientName   String?
+  message         String?
+  status          GiftCardStatus  @default(ACTIVE)
+  expiresAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  transactions GiftCardTransaction[]
+
+  @@index([code])
+  @@map("gift_cards")
+}
+
+model GiftCardTransaction {
+  id          String   @id @default(cuid())
+  giftCardId  String
+  giftCard    GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+  orderId     String?
+  amount      Float
+  type        String   // 'purchase' | 'redemption' | 'refund'
+  createdAt   DateTime @default(now())
+
+  @@index([giftCardId])
+  @@map("gift_card_transactions")
+}
+
+// ─── TAX RATES ──────────────────────────────────────────
+
+model TaxRate {
+  id        String   @id @default(cuid())
+  country   String   @default("US")
+  state     String
+  rate      Float    // e.g., 0.05 for 5%
+  name      String   // e.g., "Wisconsin Sales Tax"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([country, state])
+  @@map("tax_rates")
+}
+
+// ─── PAYMENT METHODS ────────────────────────────────────
+
+model PaymentMethod {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripePaymentMethodId String   @unique
+  type                  String   // 'card' | 'bank_account'
+  last4                 String
+  brand                 String?
+  expMonth              Int?
+  expYear               Int?
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+// ─── LOYALTY / REWARDS ──────────────────────────────────
+
+model LoyaltyAccount {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points         Int      @default(0)
+  lifetimePoints Int      @default(0)
+  tier           String   @default("BRONZE") // BRONZE, SILVER, GOLD, PLATINUM
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id          String         @id @default(cuid())
+  accountId   String
+  account     LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  points      Int
+  type        String         // 'earn' | 'redeem' | 'expire' | 'bonus'
+  description String
+  orderId     String?
+  createdAt   DateTime       @default(now())
+
+  @@index([accountId])
+  @@map("loyalty_transactions")
+}
+
+// ─── SUBSCRIPTIONS ──────────────────────────────────────
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id])
+  productId            String
+  product              Product            @relation(fields: [productId], references: [id])
+  vendorId             String
+  quantity             Int                @default(1)
+  intervalDays         Int                @default(30) // 7, 14, 30, 60, 90
+  price                Float
+  status               SubscriptionStatus @default(ACTIVE)
+  nextDeliveryAt       DateTime
+  lastDeliveryAt       DateTime?
+  stripeSubscriptionId String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ─── MARKETING CAMPAIGNS ────────────────────────────────
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+}
+
+enum CampaignType {
+  EMAIL
+  SMS
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  vendorId    String?
+  vendor      Vendor?        @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  name        String
+  subject     String?
+  body        String
+  type        CampaignType   @default(EMAIL)
+  status      CampaignStatus @default(DRAFT)
+  audience    String         @default("all") // 'all' | 'customers' | 'subscribers'
+  sentCount   Int            @default(0)
+  openCount   Int            @default(0)
+  clickCount  Int            @default(0)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([vendorId])
+  @@index([status])
+  @@map("campaigns")
 }
 
 // ─── PUSH NOTIFICATIONS ─────────────────────────────────

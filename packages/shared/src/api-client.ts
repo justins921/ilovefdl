@@ -30,6 +30,14 @@ import type {
   Conversation,
   Message,
   VendorAnalytics,
+  AbandonedCart,
+  GiftCard,
+  TaxRate,
+  PaymentMethod,
+  LoyaltyAccount,
+  LoyaltyTransaction,
+  Subscription,
+  Campaign,
 } from './types';
 import type {
   CreateVendorInput,
@@ -62,6 +70,20 @@ import type {
   SendMessageInput,
   CreateRefundInput,
   UpdateRefundInput,
+  SaveAbandonedCartInput,
+  CreateGiftCardInput,
+  RedeemGiftCardInput,
+  CreateTaxRateInput,
+  UpdateTaxRateInput,
+  CalculateTaxInput,
+  AddPaymentMethodInput,
+  RedeemPointsInput,
+  AddBonusPointsInput,
+  CreateSubscriptionInput,
+  UpdateSubscriptionInput,
+  CreateCampaignInput,
+  UpdateCampaignInput,
+  ConvertCurrencyInput,
 } from './validation';
 
 // ─── ERROR CLASS ────────────────────────────────────────
@@ -632,5 +654,202 @@ export class ApiClient {
   /** Admin: list all users */
   async adminGetUsers(params?: PaginationParams & { role?: string }): Promise<PaginatedResponse<User>> {
     return this.get<PaginatedResponse<User>>('/admin/users', params as Record<string, string | number | boolean | undefined>);
+  }
+
+  // ─── ABANDONED CARTS ──────────────────────────────────
+
+  /** Save an abandoned cart */
+  async saveAbandonedCart(data: SaveAbandonedCartInput): Promise<ApiResponse<AbandonedCart>> {
+    return this.post<ApiResponse<AbandonedCart>>('/abandoned-carts', data);
+  }
+
+  /** Get abandoned carts (admin/vendor) */
+  async getAbandonedCarts(params?: PaginationParams): Promise<PaginatedResponse<AbandonedCart>> {
+    return this.get<PaginatedResponse<AbandonedCart>>('/abandoned-carts', params as Record<string, string | number | boolean | undefined>);
+  }
+
+  /** Recover a cart by token */
+  async recoverCart(token: string): Promise<ApiResponse<AbandonedCart>> {
+    return this.get<ApiResponse<AbandonedCart>>(`/abandoned-carts/recover/${token}`);
+  }
+
+  /** Send recovery email for abandoned cart */
+  async sendCartRecoveryEmail(cartId: string): Promise<ApiResponse<{ sent: boolean }>> {
+    return this.post(`/abandoned-carts/${cartId}/send-recovery`);
+  }
+
+  // ─── GIFT CARDS ────────────────────────────────────────
+
+  /** Purchase a gift card */
+  async createGiftCard(data: CreateGiftCardInput): Promise<ApiResponse<GiftCard>> {
+    return this.post<ApiResponse<GiftCard>>('/gift-cards', data);
+  }
+
+  /** List user's gift cards */
+  async getGiftCards(): Promise<ApiResponse<GiftCard[]>> {
+    return this.get('/gift-cards');
+  }
+
+  /** Check gift card balance */
+  async checkGiftCardBalance(code: string): Promise<ApiResponse<{ balance: number; status: string }>> {
+    return this.get(`/gift-cards/balance/${code}`);
+  }
+
+  /** Redeem gift card at checkout */
+  async redeemGiftCard(data: RedeemGiftCardInput): Promise<ApiResponse<{ discount: number; remainingBalance: number }>> {
+    return this.post('/gift-cards/redeem', data);
+  }
+
+  // ─── TAX RATES ─────────────────────────────────────────
+
+  /** Calculate tax for an order */
+  async calculateTax(data: CalculateTaxInput): Promise<ApiResponse<{ tax: number; rate: number; name: string }>> {
+    return this.post('/tax/calculate', data);
+  }
+
+  /** List tax rates (admin) */
+  async getTaxRates(): Promise<ApiResponse<TaxRate[]>> {
+    return this.get('/tax');
+  }
+
+  /** Create a tax rate (admin) */
+  async createTaxRate(data: CreateTaxRateInput): Promise<ApiResponse<TaxRate>> {
+    return this.post<ApiResponse<TaxRate>>('/tax', data);
+  }
+
+  /** Update a tax rate (admin) */
+  async updateTaxRate(id: string, data: UpdateTaxRateInput): Promise<ApiResponse<TaxRate>> {
+    return this.put<ApiResponse<TaxRate>>(`/tax/${id}`, data);
+  }
+
+  /** Delete a tax rate (admin) */
+  async deleteTaxRate(id: string): Promise<void> {
+    return this.delete(`/tax/${id}`);
+  }
+
+  // ─── PAYMENT METHODS ──────────────────────────────────
+
+  /** List user's saved payment methods */
+  async getPaymentMethods(): Promise<ApiResponse<PaymentMethod[]>> {
+    return this.get('/payment-methods');
+  }
+
+  /** Add a payment method */
+  async addPaymentMethod(data: AddPaymentMethodInput): Promise<ApiResponse<PaymentMethod>> {
+    return this.post<ApiResponse<PaymentMethod>>('/payment-methods', data);
+  }
+
+  /** Set default payment method */
+  async setDefaultPaymentMethod(id: string): Promise<ApiResponse<PaymentMethod>> {
+    return this.put<ApiResponse<PaymentMethod>>(`/payment-methods/${id}/default`);
+  }
+
+  /** Delete a payment method */
+  async deletePaymentMethod(id: string): Promise<void> {
+    return this.delete(`/payment-methods/${id}`);
+  }
+
+  /** Get Stripe setup intent for adding a card */
+  async createSetupIntent(): Promise<ApiResponse<{ clientSecret: string }>> {
+    return this.post('/payment-methods/setup-intent');
+  }
+
+  // ─── LOYALTY / REWARDS ────────────────────────────────
+
+  /** Get loyalty account */
+  async getLoyaltyAccount(): Promise<ApiResponse<LoyaltyAccount>> {
+    return this.get('/loyalty');
+  }
+
+  /** Get loyalty transaction history */
+  async getLoyaltyTransactions(params?: PaginationParams): Promise<PaginatedResponse<LoyaltyTransaction>> {
+    return this.get<PaginatedResponse<LoyaltyTransaction>>('/loyalty/transactions', params as Record<string, string | number | boolean | undefined>);
+  }
+
+  /** Redeem loyalty points */
+  async redeemPoints(data: RedeemPointsInput): Promise<ApiResponse<{ discount: number; remainingPoints: number }>> {
+    return this.post('/loyalty/redeem', data);
+  }
+
+  /** Admin: add bonus points */
+  async addBonusPoints(data: AddBonusPointsInput): Promise<ApiResponse<LoyaltyAccount>> {
+    return this.post<ApiResponse<LoyaltyAccount>>('/loyalty/bonus', data);
+  }
+
+  // ─── SUBSCRIPTIONS ────────────────────────────────────
+
+  /** Get user's subscriptions */
+  async getSubscriptions(): Promise<ApiResponse<Subscription[]>> {
+    return this.get('/subscriptions');
+  }
+
+  /** Create a subscription */
+  async createSubscription(data: CreateSubscriptionInput): Promise<ApiResponse<Subscription>> {
+    return this.post<ApiResponse<Subscription>>('/subscriptions', data);
+  }
+
+  /** Update a subscription */
+  async updateSubscription(id: string, data: UpdateSubscriptionInput): Promise<ApiResponse<Subscription>> {
+    return this.put<ApiResponse<Subscription>>(`/subscriptions/${id}`, data);
+  }
+
+  /** Cancel a subscription */
+  async cancelSubscription(id: string): Promise<ApiResponse<Subscription>> {
+    return this.put<ApiResponse<Subscription>>(`/subscriptions/${id}`, { status: 'CANCELLED' });
+  }
+
+  // ─── MARKETING CAMPAIGNS ──────────────────────────────
+
+  /** List campaigns */
+  async getCampaigns(params?: PaginationParams): Promise<PaginatedResponse<Campaign>> {
+    return this.get<PaginatedResponse<Campaign>>('/campaigns', params as Record<string, string | number | boolean | undefined>);
+  }
+
+  /** Get a single campaign */
+  async getCampaign(id: string): Promise<ApiResponse<Campaign>> {
+    return this.get<ApiResponse<Campaign>>(`/campaigns/${id}`);
+  }
+
+  /** Create a campaign */
+  async createCampaign(data: CreateCampaignInput): Promise<ApiResponse<Campaign>> {
+    return this.post<ApiResponse<Campaign>>('/campaigns', data);
+  }
+
+  /** Update a campaign */
+  async updateCampaign(id: string, data: UpdateCampaignInput): Promise<ApiResponse<Campaign>> {
+    return this.put<ApiResponse<Campaign>>(`/campaigns/${id}`, data);
+  }
+
+  /** Send a campaign */
+  async sendCampaign(id: string): Promise<ApiResponse<{ sent: boolean; count: number }>> {
+    return this.post(`/campaigns/${id}/send`);
+  }
+
+  /** Delete a campaign */
+  async deleteCampaign(id: string): Promise<void> {
+    return this.delete(`/campaigns/${id}`);
+  }
+
+  // ─── MULTI-CURRENCY ───────────────────────────────────
+
+  /** Get supported currencies with exchange rates */
+  async getCurrencies(): Promise<ApiResponse<Array<{ code: string; name: string; symbol: string; rate: number }>>> {
+    return this.get('/currency');
+  }
+
+  /** Convert amount between currencies */
+  async convertCurrency(data: ConvertCurrencyInput): Promise<ApiResponse<{ amount: number; rate: number }>> {
+    return this.post('/currency/convert', data);
+  }
+
+  // ─── SHIPPING RATES ───────────────────────────────────
+
+  /** Calculate real-time shipping rates */
+  async calculateShippingRates(data: {
+    vendorId: string;
+    weight: number;
+    destination: { state: string; postalCode: string; country: string };
+  }): Promise<ApiResponse<Array<{ carrier: string; service: string; rate: number; estimatedDays: string }>>> {
+    return this.post('/shipping/rates', data);
   }
 }

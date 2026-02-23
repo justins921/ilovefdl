@@ -23,6 +23,15 @@ import messageRoutes from './routes/messages';
 import refundRoutes from './routes/refunds';
 import analyticsRoutes from './routes/analytics';
 import adminRoutes from './routes/admin';
+import abandonedCartRoutes from './routes/abandoned-carts';
+import giftCardRoutes from './routes/gift-cards';
+import taxRoutes from './routes/tax';
+import paymentMethodRoutes from './routes/payment-methods';
+import loyaltyRoutes from './routes/loyalty';
+import subscriptionRoutes from './routes/subscriptions';
+import campaignRoutes from './routes/campaigns';
+import currencyRoutes from './routes/currency';
+import shippingRateRoutes from './routes/shipping-rates';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -100,6 +109,15 @@ app.use('/messages', messageRoutes);
 app.use('/refunds', refundRoutes);
 app.use('/analytics', analyticsRoutes);
 app.use('/admin', adminRoutes);
+app.use('/abandoned-carts', abandonedCartRoutes);
+app.use('/gift-cards', giftCardRoutes);
+app.use('/tax', taxRoutes);
+app.use('/payment-methods', paymentMethodRoutes);
+app.use('/loyalty', loyaltyRoutes);
+app.use('/subscriptions', subscriptionRoutes);
+app.use('/campaigns', campaignRoutes);
+app.use('/currency', currencyRoutes);
+app.use('/shipping', shippingRateRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {

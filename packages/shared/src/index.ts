@@ -11,6 +11,10 @@ export {
   CouponType,
   ShippingType,
   RefundStatus,
+  GiftCardStatus,
+  SubscriptionStatus,
+  CampaignStatus,
+  CampaignType,
 } from './types';
 
 export type {
@@ -37,6 +41,18 @@ export type {
   Special,
   PushToken,
   NotificationPreference,
+
+  // New feature models
+  AbandonedCart,
+  AbandonedCartItem,
+  GiftCard,
+  GiftCardTransaction,
+  TaxRate,
+  PaymentMethod,
+  LoyaltyAccount,
+  LoyaltyTransaction,
+  Subscription,
+  Campaign,
 
   // Supporting types
   ShippingAddress,
@@ -84,6 +100,14 @@ export * from './schemas/wishlist';
 export * from './schemas/address';
 export * from './schemas/message';
 export * from './schemas/refund';
+export * from './schemas/abandoned-cart';
+export * from './schemas/gift-card';
+export * from './schemas/tax-rate';
+export * from './schemas/payment-method';
+export * from './schemas/loyalty';
+export * from './schemas/subscription';
+export * from './schemas/campaign';
+export * from './schemas/currency';
 
 // ─── API Client ─────────────────────────────────────────
 export { ApiClient, ApiError } from './api-client';

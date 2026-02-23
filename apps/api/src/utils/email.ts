@@ -420,6 +420,214 @@ export async function sendVendorApproval(
 }
 
 // ---------------------------------------------------------------------------
+// Abandoned cart recovery
+// ---------------------------------------------------------------------------
+
+interface AbandonedCartEmail {
+  email: string;
+  items: Array<{ name: string; price: number; quantity: number; image?: string | null }>;
+  subtotal: number;
+  recoveryToken: string;
+}
+
+export async function sendCartRecoveryEmail(
+  cart: AbandonedCartEmail,
+): Promise<void> {
+  const appUrl = process.env.APP_URL || process.env.BASE_URL || 'http://localhost:3000';
+  const recoveryUrl = `${appUrl}/cart/recover?token=${cart.recoveryToken}`;
+
+  const itemRows = cart.items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;">
+          ${item.image ? `<img src="${item.image}" alt="${item.name}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;" />` : ''}
+          ${item.name}
+        </td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:center;">${item.quantity}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:right;">${formatCurrency(item.price)}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const body = `
+    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">You left something behind!</h2>
+    <p style="color:#4b5563;line-height:1.6;font-size:15px;">
+      It looks like you left some great items in your cart. They&rsquo;re still waiting for you!
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border:1px solid #e5e7eb;border-radius:6px;border-collapse:collapse;">
+      <thead>
+        <tr style="background-color:#f9fafb;">
+          <th style="padding:10px 12px;text-align:left;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">Item</th>
+          <th style="padding:10px 12px;text-align:center;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">Qty</th>
+          <th style="padding:10px 12px;text-align:right;font-size:13px;color:#6b7280;font-weight:600;border-bottom:2px solid #e5e7eb;">Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1a1a1a;">Subtotal</td>
+          <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1a1a1a;">${formatCurrency(cart.subtotal)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    ${buttonHtml(recoveryUrl, 'Complete Your Purchase')}
+    <p style="color:#9ca3af;font-size:13px;margin-top:24px;">
+      This is an automated reminder. If you&rsquo;ve already completed your purchase or no longer need these items, you can safely ignore this email.
+    </p>`;
+
+  const text = `You left something behind!\n\nYou have items in your cart waiting for you.\nSubtotal: ${formatCurrency(cart.subtotal)}\n\nComplete your purchase: ${recoveryUrl}`;
+
+  await send(
+    cart.email,
+    'You left items in your cart!',
+    wrapHtml('Cart Recovery', body),
+    text,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gift card delivery
+// ---------------------------------------------------------------------------
+
+interface GiftCardEmail {
+  recipientEmail: string;
+  recipientName: string;
+  senderName: string;
+  amount: number;
+  code: string;
+  message?: string;
+}
+
+export async function sendGiftCardEmail(
+  gift: GiftCardEmail,
+): Promise<void> {
+  const appUrl = process.env.APP_URL || process.env.BASE_URL || 'http://localhost:3000';
+
+  const body = `
+    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">You&rsquo;ve received a gift card!</h2>
+    <p style="color:#4b5563;line-height:1.6;font-size:15px;">
+      Hi ${gift.recipientName},
+    </p>
+    <p style="color:#4b5563;line-height:1.6;font-size:15px;">
+      ${gift.senderName} has sent you an I Love FDL gift card!
+    </p>
+    ${gift.message ? `<div style="margin:20px 0;padding:16px 20px;background-color:#f9fafb;border-radius:6px;border-left:4px solid ${BRAND_ACCENT};"><p style="color:#4b5563;font-size:15px;margin:0;font-style:italic;">&ldquo;${gift.message}&rdquo;</p></div>` : ''}
+    <div style="margin:24px 0;padding:24px;background-color:#f0fdf4;border-radius:8px;text-align:center;">
+      <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Gift Card Value</p>
+      <p style="margin:0 0 16px;color:#059669;font-size:32px;font-weight:700;">${formatCurrency(gift.amount)}</p>
+      <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Your Code</p>
+      <p style="margin:0;color:#1a1a1a;font-size:24px;font-weight:700;font-family:monospace;letter-spacing:2px;">${gift.code}</p>
+    </div>
+    ${buttonHtml(`${appUrl}/gift-cards`, 'Shop Now')}
+    <p style="color:#9ca3af;font-size:13px;margin-top:24px;">
+      Use this code at checkout to apply your gift card balance to any purchase on I Love FDL.
+    </p>`;
+
+  const text = `You've received a gift card!\n\nHi ${gift.recipientName},\n\n${gift.senderName} sent you an I Love FDL gift card worth ${formatCurrency(gift.amount)}.\n\nYour code: ${gift.code}\n\n${gift.message ? `Message: "${gift.message}"\n\n` : ''}Redeem it at ${appUrl}/gift-cards`;
+
+  await send(
+    gift.recipientEmail,
+    `${gift.senderName} sent you an I Love FDL gift card!`,
+    wrapHtml('Gift Card', body),
+    text,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subscription reminder
+// ---------------------------------------------------------------------------
+
+interface SubscriptionReminderEmail {
+  email: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  nextDeliveryDate: string;
+}
+
+export async function sendSubscriptionReminderEmail(
+  data: SubscriptionReminderEmail,
+): Promise<void> {
+  const appUrl = process.env.APP_URL || process.env.BASE_URL || 'http://localhost:3000';
+
+  const body = `
+    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">Upcoming Subscription Delivery</h2>
+    <p style="color:#4b5563;line-height:1.6;font-size:15px;">
+      Your recurring order is coming up! Here are the details:
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background-color:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;">
+      <tr>
+        <td style="padding:16px 20px;">
+          <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;">Product</p>
+          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${data.productName} x${data.quantity}</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 20px 16px;">
+          <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;">Amount</p>
+          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${formatCurrency(data.price)}</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 20px 16px;">
+          <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;">Next Delivery</p>
+          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${data.nextDeliveryDate}</p>
+        </td>
+      </tr>
+    </table>
+    ${buttonHtml(`${appUrl}/account/subscriptions`, 'Manage Subscriptions')}
+    <p style="color:#9ca3af;font-size:13px;margin-top:24px;">
+      You can pause, modify, or cancel your subscription at any time from your account settings.
+    </p>`;
+
+  const text = `Upcoming Subscription Delivery\n\nProduct: ${data.productName} x${data.quantity}\nAmount: ${formatCurrency(data.price)}\nNext Delivery: ${data.nextDeliveryDate}\n\nManage at ${appUrl}/account/subscriptions`;
+
+  await send(
+    data.email,
+    'Your subscription delivery is coming up',
+    wrapHtml('Subscription Reminder', body),
+    text,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty points earned
+// ---------------------------------------------------------------------------
+
+export async function sendLoyaltyPointsEmail(
+  to: string,
+  name: string,
+  pointsEarned: number,
+  totalPoints: number,
+  tier: string,
+): Promise<void> {
+  const appUrl = process.env.APP_URL || process.env.BASE_URL || 'http://localhost:3000';
+
+  const tierColor = tier === 'PLATINUM' ? '#6366f1' : tier === 'GOLD' ? '#d97706' : tier === 'SILVER' ? '#6b7280' : '#92400e';
+
+  const body = `
+    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">You earned rewards points!</h2>
+    <p style="color:#4b5563;line-height:1.6;font-size:15px;">
+      Hi ${name}, you just earned <strong>${pointsEarned} points</strong> from your purchase!
+    </p>
+    <div style="margin:24px 0;padding:24px;background-color:#f0fdf4;border-radius:8px;text-align:center;">
+      <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">Points Earned</p>
+      <p style="margin:0 0 16px;color:#059669;font-size:28px;font-weight:700;">+${pointsEarned}</p>
+      <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">Total Balance</p>
+      <p style="margin:0 0 12px;color:#1a1a1a;font-size:24px;font-weight:700;">${totalPoints.toLocaleString()} points</p>
+      <span style="display:inline-block;padding:4px 12px;border-radius:9999px;background-color:${tierColor};color:#ffffff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">${tier} MEMBER</span>
+    </div>
+    ${buttonHtml(`${appUrl}/account/loyalty`, 'View Rewards')}`;
+
+  const text = `You earned ${pointsEarned} reward points!\n\nTotal balance: ${totalPoints} points\nTier: ${tier}\n\nView at ${appUrl}/account/loyalty`;
+
+  await send(to, 'You earned reward points!', wrapHtml('Loyalty Rewards', body), text);
+}
+
+// ---------------------------------------------------------------------------
 // Default export (backwards compatibility)
 // ---------------------------------------------------------------------------
 
