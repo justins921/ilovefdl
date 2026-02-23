@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Menu,
   X,
@@ -12,6 +11,7 @@ import {
   LogOut,
   LayoutDashboard,
 } from 'lucide-react';
+import { useAuth } from './AuthProvider';
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -20,41 +20,19 @@ const navLinks = [
   { label: 'Bars & Specials', href: '/bars' },
 ];
 
-interface AuthUser {
-  id: string;
-  name: string | null;
-  email: string;
-  role: string;
-}
-
 export default function Header() {
-  const router = useRouter();
+  const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('ilovefdl_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
-
   const handleLogout = () => {
-    localStorage.removeItem('ilovefdl_token');
-    localStorage.removeItem('ilovefdl_user');
-    localStorage.removeItem('ilovefdl_refresh_token');
-    setUser(null);
     setUserMenuOpen(false);
     setMobileMenuOpen(false);
-    router.push('/');
+    logout();
   };
 
-  const dashboardHref = user?.role === 'ADMIN' ? '/admin' : '/dashboard';
+  const dashboardHref =
+    user?.role === 'ADMIN' || user?.role === 'EDITOR' ? '/admin' : '/dashboard';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-t-4 border-teal shadow-sm">
@@ -111,7 +89,7 @@ export default function Header() {
                       <p className="text-sm font-medium text-primary truncate">{user.name || user.email}</p>
                       <p className="text-xs text-primary/50 truncate">{user.email}</p>
                     </div>
-                    {(user.role === 'ADMIN' || user.role === 'VENDOR') && (
+                    {(user.role === 'ADMIN' || user.role === 'EDITOR' || user.role === 'VENDOR') && (
                       <Link
                         href={dashboardHref}
                         onClick={() => setUserMenuOpen(false)}
@@ -119,6 +97,16 @@ export default function Header() {
                       >
                         <LayoutDashboard className="w-4 h-4" />
                         Dashboard
+                      </Link>
+                    )}
+                    {user.role === 'USER' && (
+                      <Link
+                        href="/account"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-primary/80 hover:bg-light transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        My Account
                       </Link>
                     )}
                     <button
@@ -184,7 +172,7 @@ export default function Header() {
                 {user ? (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-primary">{user.name || user.email}</p>
-                    {(user.role === 'ADMIN' || user.role === 'VENDOR') && (
+                    {(user.role === 'ADMIN' || user.role === 'EDITOR' || user.role === 'VENDOR') && (
                       <Link
                         href={dashboardHref}
                         onClick={() => setMobileMenuOpen(false)}
@@ -192,6 +180,16 @@ export default function Header() {
                       >
                         <LayoutDashboard className="w-4 h-4" />
                         Dashboard
+                      </Link>
+                    )}
+                    {user.role === 'USER' && (
+                      <Link
+                        href="/account"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 py-2 text-sm text-primary/80"
+                      >
+                        <User className="w-4 h-4" />
+                        My Account
                       </Link>
                     )}
                     <button

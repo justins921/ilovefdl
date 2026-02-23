@@ -63,12 +63,10 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({
       data: posts,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error('List posts error:', error);

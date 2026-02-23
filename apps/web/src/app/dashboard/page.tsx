@@ -13,13 +13,14 @@ import {
   Clock,
   TrendingUp,
   BarChart3,
-  Settings,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { useAuth } from '@/components/AuthProvider';
 import { formatPrice, formatDate } from '@/lib/utils';
 import type { Order, Product, Vendor } from '@ilovefdl/shared';
 
 export default function VendorDashboardPage() {
+  const { user, loading: authLoading } = useAuth();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,22 +28,13 @@ export default function VendorDashboardPage() {
   const [totalRevenue, setTotalRevenue] = useState(0);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+
     async function fetchDashboardData() {
       try {
-        // Get current user info from localStorage
-        const userStr = localStorage.getItem('ilovefdl_user');
-        if (!userStr) return;
-        const user = JSON.parse(userStr);
-
-        const tokenStr = localStorage.getItem('ilovefdl_token');
-        if (tokenStr) {
-          api.setToken(tokenStr);
-        }
-
-        // For demo, try fetching the vendor associated with current user
-        // In a full implementation, there would be a /me/vendor endpoint
         const vendorsRes = await api.getVendors({ limit: 100 });
-        const myVendor = vendorsRes.data.find((v) => v.userId === user.id);
+        const myVendor = vendorsRes.data.find((v) => v.userId === user!.id);
 
         if (myVendor) {
           setVendor(myVendor);
@@ -65,7 +57,7 @@ export default function VendorDashboardPage() {
       }
     }
     fetchDashboardData();
-  }, []);
+  }, [user, authLoading]);
 
   const statusColors: Record<string, string> = {
     PENDING: 'bg-yellow-100 text-yellow-800',
@@ -75,7 +67,7 @@ export default function VendorDashboardPage() {
     CANCELLED: 'bg-red-100 text-red-800',
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -248,6 +240,18 @@ export default function VendorDashboardPage() {
               <h3 className="font-bold text-primary mb-4">Quick Actions</h3>
               <div className="space-y-3">
                 <Link
+                  href="/dashboard/products"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Plus className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Manage Products
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
                   href={`/vendors/${vendor.slug}`}
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
                 >
@@ -278,9 +282,12 @@ export default function VendorDashboardPage() {
             <div className="bg-white rounded-xl border border-light p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-primary">Your Products</h3>
-                <span className="text-xs text-primary/50">
-                  {products.length} total
-                </span>
+                <Link
+                  href="/dashboard/products"
+                  className="text-xs text-teal hover:underline"
+                >
+                  Manage All
+                </Link>
               </div>
               {products.length > 0 ? (
                 <div className="space-y-3">
@@ -319,9 +326,17 @@ export default function VendorDashboardPage() {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-primary/60 text-center py-4">
-                  No products listed yet.
-                </p>
+                <div className="text-center py-4">
+                  <p className="text-sm text-primary/60 mb-3">
+                    No products listed yet.
+                  </p>
+                  <Link
+                    href="/dashboard/products"
+                    className="text-sm text-teal hover:underline font-medium"
+                  >
+                    Add your first product
+                  </Link>
+                </div>
               )}
             </div>
           </div>

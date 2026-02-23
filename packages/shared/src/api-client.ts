@@ -183,7 +183,7 @@ export class ApiClient {
 
   /** Update an existing vendor */
   async updateVendor(id: string, data: UpdateVendorInput): Promise<ApiResponse<Vendor>> {
-    return this.patch<ApiResponse<Vendor>>(`/vendors/${id}`, data);
+    return this.put<ApiResponse<Vendor>>(`/vendors/${id}`, data);
   }
 
   // ─── PRODUCTS ─────────────────────────────────────────
@@ -207,7 +207,7 @@ export class ApiClient {
 
   /** Update an existing product */
   async updateProduct(id: string, data: UpdateProductInput): Promise<ApiResponse<Product>> {
-    return this.patch<ApiResponse<Product>>(`/products/${id}`, data);
+    return this.put<ApiResponse<Product>>(`/products/${id}`, data);
   }
 
   // ─── ORDERS / CHECKOUT ────────────────────────────────
@@ -258,7 +258,17 @@ export class ApiClient {
 
   /** Update an existing blog post */
   async updatePost(id: string, data: UpdateBlogPostInput): Promise<ApiResponse<BlogPost>> {
-    return this.patch<ApiResponse<BlogPost>>(`/posts/${id}`, data);
+    return this.put<ApiResponse<BlogPost>>(`/posts/${id}`, data);
+  }
+
+  /** Delete a blog post (admin only) */
+  async deletePost(id: string): Promise<void> {
+    return this.delete(`/posts/${id}`);
+  }
+
+  /** Delete a product (soft delete) */
+  async deleteProduct(id: string): Promise<void> {
+    return this.delete(`/products/${id}`);
   }
 
   // ─── BARS ─────────────────────────────────────────────
@@ -282,7 +292,7 @@ export class ApiClient {
 
   /** Update an existing bar */
   async updateBar(id: string, data: UpdateBarInput): Promise<ApiResponse<Bar>> {
-    return this.patch<ApiResponse<Bar>>(`/bars/${id}`, data);
+    return this.put<ApiResponse<Bar>>(`/bars/${id}`, data);
   }
 
   // ─── SPECIALS ─────────────────────────────────────────
@@ -306,7 +316,7 @@ export class ApiClient {
 
   /** Update an existing special */
   async updateSpecial(id: string, data: UpdateSpecialInput): Promise<ApiResponse<Special>> {
-    return this.patch<ApiResponse<Special>>(`/specials/${id}`, data);
+    return this.put<ApiResponse<Special>>(`/specials/${id}`, data);
   }
 
   // ─── PUSH NOTIFICATIONS ──────────────────────────────

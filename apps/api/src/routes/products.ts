@@ -63,12 +63,10 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({
       data: products,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error('List products error:', error);
@@ -120,7 +118,15 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       where: { userId: req.user!.id },
     });
 
-    if (!vendor && req.user!.role !== 'ADMIN') {
+    // Admins can pass vendorId in the body to create products for any vendor
+    const bodyVendorId = (req.body as Record<string, unknown>).vendorId as string | undefined;
+    let resolvedVendorId: string;
+
+    if (req.user!.role === 'ADMIN' && bodyVendorId) {
+      resolvedVendorId = bodyVendorId;
+    } else if (vendor) {
+      resolvedVendorId = vendor.id;
+    } else {
       res.status(403).json({ error: 'You must be a vendor to create products' });
       return;
     }
@@ -139,7 +145,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     const product = await prisma.product.create({
       data: {
         ...rest,
-        vendorId: vendor!.id,
+        vendorId: resolvedVendorId,
         images: rest.images || [],
         categoryTags: rest.categoryTags || [],
         metadata: toJsonOrDbNull(metadata),
