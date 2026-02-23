@@ -6,6 +6,7 @@ import type {
   LoginResponse,
   CheckoutSession,
   CheckoutLineItem,
+  ShippingAddress,
   User,
   Vendor,
   Product,
@@ -162,6 +163,16 @@ export class ApiClient {
     return this.get<ApiResponse<User>>('/auth/me');
   }
 
+  /** Request a password reset email */
+  async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email });
+  }
+
+  /** Reset password with token */
+  async resetPassword(token: string, password: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<ApiResponse<{ message: string }>>('/auth/reset-password', { token, password });
+  }
+
   // ─── VENDORS ──────────────────────────────────────────
 
   /** List vendors with optional pagination */
@@ -235,6 +246,15 @@ export class ApiClient {
   /** Get a single order by ID */
   async getOrder(id: string): Promise<ApiResponse<Order>> {
     return this.get<ApiResponse<Order>>(`/orders/${id}`);
+  }
+
+  /** Create a multi-vendor checkout session */
+  async createMultiVendorCheckout(
+    items: CheckoutLineItem[],
+    shippingAddress?: ShippingAddress,
+    notes?: string,
+  ): Promise<ApiResponse<{ sessionId: string; sessionUrl: string; orderGroupId: string; orderIds: string[] }>> {
+    return this.post('/checkout/multi', { items, shippingAddress, notes });
   }
 
   // ─── BLOG POSTS ───────────────────────────────────────

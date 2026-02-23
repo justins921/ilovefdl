@@ -13,8 +13,10 @@
 export {
   loginSchema,
   registerSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from './schemas/auth';
-export type { LoginInput, RegisterInput } from './schemas/auth';
+export type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput } from './schemas/auth';
 
 // Vendor
 export { createVendorSchema, updateVendorSchema } from './schemas/vendor';
@@ -35,15 +37,18 @@ export type {
 // Order
 export {
   checkoutItemSchema,
+  shippingAddressSchema,
   createCheckoutSchema,
   createOrderSchema,
   updateOrderStatusSchema,
+  createMultiVendorCheckoutSchema,
 } from './schemas/order';
 export type {
   CheckoutItem,
   CreateCheckoutInput,
   CreateOrderInput,
   UpdateOrderStatusInput,
+  CreateMultiVendorCheckoutInput,
 } from './schemas/order';
 
 // Blog

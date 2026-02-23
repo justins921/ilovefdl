@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { formatPrice } from '@/lib/utils';
+import { useCart } from '@/components/CartProvider';
 import type { Product } from '@ilovefdl/shared';
 
 export default function ProductDetailPage({
@@ -24,6 +25,7 @@ export default function ProductDetailPage({
 }: {
   params: { slug: string };
 }) {
+  const { addItem } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -46,26 +48,18 @@ export default function ProductDetailPage({
 
   const handleAddToCart = () => {
     if (!product) return;
-    // Store in localStorage cart
-    const cart = JSON.parse(localStorage.getItem('ilovefdl_cart') || '[]');
-    const existingItem = cart.find(
-      (item: { productId: string }) => item.productId === product.id
-    );
-    if (existingItem) {
-      existingItem.quantity += quantity;
-    } else {
-      cart.push({
+    addItem(
+      {
         productId: product.id,
         name: product.name,
         price: product.price,
         image: product.images?.[0] || null,
         vendorId: product.vendorId,
         vendorName: product.vendor?.businessName || '',
-        quantity,
         slug: product.slug,
-      });
-    }
-    localStorage.setItem('ilovefdl_cart', JSON.stringify(cart));
+      },
+      quantity,
+    );
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   };

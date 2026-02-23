@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
+import { useCart } from './CartProvider';
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -22,6 +23,7 @@ const navLinks = [
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { itemCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -71,6 +73,11 @@ export default function Header() {
               aria-label="Shopping cart"
             >
               <ShoppingCart className="w-5 h-5" />
+              {itemCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {itemCount > 99 ? '99+' : itemCount}
+                </span>
+              )}
             </Link>
 
             {user ? (
@@ -134,10 +141,15 @@ export default function Header() {
           <div className="flex md:hidden items-center gap-3">
             <Link
               href="/cart"
-              className="p-2 text-primary/70 hover:text-teal transition-colors"
+              className="relative p-2 text-primary/70 hover:text-teal transition-colors"
               aria-label="Shopping cart"
             >
               <ShoppingCart className="w-5 h-5" />
+              {itemCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {itemCount > 99 ? '99+' : itemCount}
+                </span>
+              )}
             </Link>
             <button
               type="button"

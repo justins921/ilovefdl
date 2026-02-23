@@ -83,8 +83,22 @@ model User {
   blogPosts              BlogPost[]
   pushTokens             PushToken[]
   notificationPreference NotificationPreference?
+  passwordResetTokens    PasswordResetToken[]
 
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@map("password_reset_tokens")
 }
 
 // ─── VENDOR ──────────────────────────────────────────────
@@ -184,6 +198,7 @@ model Order {
   vendorNetAmount      Float
   processorFeeAmount   Float       @default(0)
 
+  orderGroupId         String?
   stripeSessionId      String?     @unique
   stripePaymentIntent  String?     @unique
 
@@ -196,6 +211,7 @@ model Order {
 
   @@index([userId])
   @@index([vendorId])
+  @@index([orderGroupId])
   @@map("orders")
 }
 

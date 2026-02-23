@@ -161,6 +161,17 @@ export default function AuthPage() {
               </div>
             </div>
 
+            {mode === 'login' && (
+              <div className="text-right mb-4">
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-sm text-teal hover:text-teal/80 transition-colors"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
+            )}
+
             {error && (
               <div className="mb-4 p-3 bg-accent/5 border border-accent/20 rounded-lg text-accent text-sm">
                 {error}
