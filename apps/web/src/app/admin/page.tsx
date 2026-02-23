@@ -20,6 +20,11 @@ import {
   EyeOff,
   ListFilter,
   ImageIcon,
+  Users,
+  RotateCcw,
+  Package,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -31,17 +36,20 @@ import type {
   Bar,
   Special,
   Order,
+  Refund,
+  User as UserType,
 } from '@ilovefdl/shared';
 import {
   PostCategory,
   PostStatus,
   DayOfWeek,
   ExternalPlatform,
+  RefundStatus,
 } from '@ilovefdl/shared';
 
 // ─── TYPES ──────────────────────────────────────────────
 
-type ActiveTab = 'overview' | 'posts' | 'bars' | 'products' | 'vendors';
+type ActiveTab = 'overview' | 'posts' | 'bars' | 'products' | 'vendors' | 'orders' | 'refunds' | 'users';
 
 interface DashboardStats {
   vendorCount: number;
@@ -58,6 +66,9 @@ const navItems: { id: ActiveTab; label: string; icon: typeof BarChart3 }[] = [
   { id: 'bars', label: 'Bars & Specials', icon: Beer },
   { id: 'products', label: 'Products', icon: ShoppingBag },
   { id: 'vendors', label: 'Vendors', icon: Store },
+  { id: 'orders', label: 'Orders', icon: Package },
+  { id: 'refunds', label: 'Refunds', icon: RotateCcw },
+  { id: 'users', label: 'Users', icon: Users },
 ];
 
 // ─── MAIN COMPONENT ─────────────────────────────────────
@@ -145,6 +156,9 @@ export default function AdminPage() {
           {activeTab === 'bars' && <BarsSection />}
           {activeTab === 'products' && <ProductsSection />}
           {activeTab === 'vendors' && <VendorsSection />}
+          {activeTab === 'orders' && <OrdersAdminSection />}
+          {activeTab === 'refunds' && <RefundsAdminSection />}
+          {activeTab === 'users' && <UsersAdminSection />}
         </div>
       </main>
     </div>
@@ -2028,6 +2042,352 @@ function VendorsSection() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+// ─── ORDERS ADMIN SECTION ──────────────────────────────
+
+function OrdersAdminSection() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  useEffect(() => {
+    async function fetchOrders() {
+      setLoading(true);
+      try {
+        const params: Record<string, string | number> = { limit: 50 };
+        if (statusFilter !== 'ALL') params.status = statusFilter;
+        const res = await api.adminGetOrders(params as Parameters<typeof api.adminGetOrders>[0]);
+        setOrders(res.data);
+      } catch { /* */ } finally {
+        setLoading(false);
+      }
+    }
+    fetchOrders();
+  }, [statusFilter]);
+
+  async function handleStatusChange(orderId: string, status: string) {
+    try {
+      await api.adminUpdateOrderStatus(orderId, status);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: status as Order['status'] } : o))
+      );
+    } catch { /* */ }
+  }
+
+  const statusColors: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-800',
+    PAID: 'bg-blue-100 text-blue-800',
+    PROCESSING: 'bg-indigo-100 text-indigo-800',
+    SHIPPED: 'bg-purple-100 text-purple-800',
+    FULFILLED: 'bg-green-100 text-green-800',
+    REFUNDED: 'bg-gray-100 text-gray-800',
+    CANCELLED: 'bg-red-100 text-red-800',
+  };
+
+  const statuses = ['ALL', 'PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'FULFILLED', 'REFUNDED', 'CANCELLED'];
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {statuses.map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              statusFilter === s
+                ? 'bg-primary text-white'
+                : 'bg-white text-primary/60 border border-light hover:text-primary'
+            }`}
+          >
+            {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="p-12 text-center">
+            <Package className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No orders found.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Order</th>
+                  <th className="px-6 py-3">Customer</th>
+                  <th className="px-6 py-3">Vendor</th>
+                  <th className="px-6 py-3">Total</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {orders.map((order) => (
+                  <tr key={order.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-mono text-primary/60">
+                      #{order.id.slice(0, 8)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary">
+                      {order.user?.name || order.user?.email || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {order.vendor?.businessName || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-primary">
+                      {formatPrice(order.total)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {formatDate(order.createdAt)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                        className="text-xs border border-light rounded px-2 py-1"
+                      >
+                        {statuses.filter(s => s !== 'ALL').map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── REFUNDS ADMIN SECTION ─────────────────────────────
+
+function RefundsAdminSection() {
+  const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRefunds() {
+      try {
+        const res = await api.getRefunds({ limit: 50 });
+        setRefunds(res.data);
+      } catch { /* */ } finally {
+        setLoading(false);
+      }
+    }
+    fetchRefunds();
+  }, []);
+
+  async function handleRefundAction(refundId: string, status: string) {
+    try {
+      await api.updateRefund(refundId, { status: status as RefundStatus });
+      setRefunds((prev) =>
+        prev.map((r) => (r.id === refundId ? { ...r, status: status as Refund['status'] } : r))
+      );
+    } catch { /* */ }
+  }
+
+  const refundStatusColors: Record<string, string> = {
+    REQUESTED: 'bg-yellow-100 text-yellow-800',
+    APPROVED: 'bg-blue-100 text-blue-800',
+    REJECTED: 'bg-red-100 text-red-800',
+    PROCESSED: 'bg-green-100 text-green-800',
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-light overflow-hidden">
+      {loading ? (
+        <div className="p-8 flex justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+        </div>
+      ) : refunds.length === 0 ? (
+        <div className="p-12 text-center">
+          <RotateCcw className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+          <p className="text-primary/60 text-sm">No refund requests.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                <th className="px-6 py-3">Refund ID</th>
+                <th className="px-6 py-3">Order</th>
+                <th className="px-6 py-3">Amount</th>
+                <th className="px-6 py-3">Reason</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-light">
+              {refunds.map((refund) => (
+                <tr key={refund.id} className="hover:bg-light/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-mono text-primary/60">
+                    {refund.id.slice(0, 8)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-primary">
+                    #{refund.orderId.slice(0, 8)}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-primary">
+                    {formatPrice(refund.amount)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-primary/60 max-w-xs truncate">
+                    {refund.reason || '-'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${refundStatusColors[refund.status] || 'bg-gray-100 text-gray-800'}`}>
+                      {refund.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-primary/60">
+                    {formatDate(refund.createdAt)}
+                  </td>
+                  <td className="px-6 py-4">
+                    {refund.status === 'REQUESTED' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRefundAction(refund.id, 'APPROVED')}
+                          className="text-green-600 hover:text-green-800 transition-colors"
+                          title="Approve"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRefundAction(refund.id, 'REJECTED')}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Reject"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    {refund.status === 'APPROVED' && (
+                      <button
+                        onClick={() => handleRefundAction(refund.id, 'PROCESSED')}
+                        className="text-xs text-teal font-medium hover:text-teal/80"
+                      >
+                        Process Refund
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── USERS ADMIN SECTION ───────────────────────────────
+
+function UsersAdminSection() {
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [roleFilter, setRoleFilter] = useState('ALL');
+
+  useEffect(() => {
+    async function fetchUsers() {
+      setLoading(true);
+      try {
+        const params: Record<string, string | number> = { limit: 100 };
+        if (roleFilter !== 'ALL') params.role = roleFilter;
+        const res = await api.adminGetUsers(params as Parameters<typeof api.adminGetUsers>[0]);
+        setUsers(res.data);
+      } catch { /* */ } finally {
+        setLoading(false);
+      }
+    }
+    fetchUsers();
+  }, [roleFilter]);
+
+  const roles = ['ALL', 'USER', 'VENDOR', 'EDITOR', 'ADMIN'];
+
+  const roleColors: Record<string, string> = {
+    USER: 'bg-gray-100 text-gray-800',
+    VENDOR: 'bg-teal/10 text-teal',
+    EDITOR: 'bg-blue-100 text-blue-800',
+    ADMIN: 'bg-purple-100 text-purple-800',
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-4">
+        {roles.map((r) => (
+          <button
+            key={r}
+            onClick={() => setRoleFilter(r)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              roleFilter === r
+                ? 'bg-primary text-white'
+                : 'bg-white text-primary/60 border border-light hover:text-primary'
+            }`}
+          >
+            {r === 'ALL' ? 'All' : r.charAt(0) + r.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-xl border border-light overflow-hidden">
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+          </div>
+        ) : users.length === 0 ? (
+          <div className="p-12 text-center">
+            <Users className="w-10 h-10 text-primary/20 mx-auto mb-3" />
+            <p className="text-primary/60 text-sm">No users found.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider border-b border-light">
+                  <th className="px-6 py-3">Name</th>
+                  <th className="px-6 py-3">Email</th>
+                  <th className="px-6 py-3">Role</th>
+                  <th className="px-6 py-3">Joined</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-light">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-light/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-primary">
+                      {u.name || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">{u.email}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleColors[u.role] || 'bg-gray-100 text-gray-800'}`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-primary/60">
+                      {formatDate(u.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </>
   );
 }

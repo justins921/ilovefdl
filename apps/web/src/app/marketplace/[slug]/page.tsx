@@ -18,6 +18,7 @@ import {
 import api from '@/lib/api';
 import { formatPrice } from '@/lib/utils';
 import { useCart } from '@/components/CartProvider';
+import ProductReviews from '@/components/ProductReviews';
 import type { Product } from '@ilovefdl/shared';
 
 export default function ProductDetailPage({
@@ -321,6 +322,9 @@ export default function ProductDetailPage({
             </div>
           </div>
         </div>
+
+        {/* Product Reviews */}
+        <ProductReviews productId={product.id} />
       </div>
     </div>
   );

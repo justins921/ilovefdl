@@ -111,3 +111,31 @@ export type {
   SyncInventoryInput,
   DisconnectPlatformInput,
 } from './schemas/integration';
+
+// Reviews
+export { createReviewSchema, updateReviewSchema, reviewQuerySchema } from './schemas/review';
+export type { CreateReviewInput, UpdateReviewInput, ReviewQuery } from './schemas/review';
+
+// Coupons
+export { createCouponSchema, updateCouponSchema, validateCouponSchema } from './schemas/coupon';
+export type { CreateCouponInput, UpdateCouponInput, ValidateCouponInput } from './schemas/coupon';
+
+// Shipping
+export { createShippingProfileSchema, updateShippingProfileSchema } from './schemas/shipping';
+export type { CreateShippingProfileInput, UpdateShippingProfileInput } from './schemas/shipping';
+
+// Wishlist
+export { addWishlistItemSchema } from './schemas/wishlist';
+export type { AddWishlistItemInput } from './schemas/wishlist';
+
+// Address
+export { createAddressSchema, updateAddressSchema } from './schemas/address';
+export type { CreateAddressInput, UpdateAddressInput } from './schemas/address';
+
+// Message
+export { createConversationSchema, sendMessageSchema } from './schemas/message';
+export type { CreateConversationInput, SendMessageInput } from './schemas/message';
+
+// Refund
+export { createRefundSchema, updateRefundSchema } from './schemas/refund';
+export type { CreateRefundInput, UpdateRefundInput } from './schemas/refund';
