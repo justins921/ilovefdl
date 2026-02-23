@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../.. && npm install && npm run build --workspace=packages/shared && npx prisma db push --schema=apps/api/prisma/schema.prisma && npx prisma generate --schema=apps/api/prisma/schema.prisma",
+  "installCommand": "cd ../.. && npm install && npm run build --workspace=packages/shared && npx prisma generate --schema=apps/api/prisma/schema.prisma",
   "regions": ["cle1"],
   "headers": [
     {
