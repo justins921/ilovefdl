@@ -383,7 +383,7 @@ function BlogPostsSection() {
     setSaving(true);
     setError(null);
     try {
-      const data: Record<string, unknown> = {
+      const data = {
         title: formTitle,
         slug: formSlug,
         content: formContent,
@@ -395,11 +395,11 @@ function BlogPostsSection() {
           .split(',')
           .map((t) => t.trim())
           .filter(Boolean),
+        scheduledAt:
+          targetStatus === PostStatus.SCHEDULED && formScheduledAt
+            ? new Date(formScheduledAt).toISOString()
+            : undefined,
       };
-
-      if (targetStatus === PostStatus.SCHEDULED && formScheduledAt) {
-        data.scheduledAt = new Date(formScheduledAt).toISOString();
-      }
 
       if (editingPost) {
         await api.updatePost(editingPost.id, data);
