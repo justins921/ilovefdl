@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { authMiddleware } from './middleware/auth';
+import { securityHeaders, apiRateLimit, authRateLimit } from './middleware/security';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -12,9 +13,22 @@ import blogRoutes from './routes/blog';
 import barRoutes from './routes/bars';
 import specialRoutes from './routes/specials';
 import notificationRoutes from './routes/notifications';
+import integrationRoutes from './routes/integrations';
+import reviewRoutes from './routes/reviews';
+import couponRoutes from './routes/coupons';
+import shippingRoutes from './routes/shipping';
+import wishlistRoutes from './routes/wishlist';
+import addressRoutes from './routes/addresses';
+import messageRoutes from './routes/messages';
+import refundRoutes from './routes/refunds';
+import analyticsRoutes from './routes/analytics';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// ─── Security Headers ────────────────────────────────────
+app.use(securityHeaders);
 
 // ─── CORS ────────────────────────────────────────────────
 app.use(
@@ -35,6 +49,9 @@ app.post(
 // ─── Body parsing ────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ─── Rate Limiting ───────────────────────────────────────
+app.use(apiRateLimit);
 
 // ─── Health check (before auth so it responds instantly) ──
 app.get('/health', (_req, res) => {
@@ -64,7 +81,7 @@ app.use(authMiddleware);
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ─── API Routes ──────────────────────────────────────────
-app.use('/auth', authRoutes);
+app.use('/auth', authRateLimit, authRoutes);
 app.use('/vendors', vendorRoutes);
 app.use('/products', productRoutes);
 app.use('/checkout', orderRoutes);
@@ -73,6 +90,16 @@ app.use('/posts', blogRoutes);
 app.use('/bars', barRoutes);
 app.use('/specials', specialRoutes);
 app.use('/push', notificationRoutes);
+app.use('/integrations', integrationRoutes);
+app.use('/reviews', reviewRoutes);
+app.use('/coupons', couponRoutes);
+app.use('/shipping', shippingRoutes);
+app.use('/wishlist', wishlistRoutes);
+app.use('/addresses', addressRoutes);
+app.use('/messages', messageRoutes);
+app.use('/refunds', refundRoutes);
+app.use('/analytics', analyticsRoutes);
+app.use('/admin', adminRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {

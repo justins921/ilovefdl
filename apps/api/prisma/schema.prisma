@@ -27,6 +27,8 @@ enum VendorStatus {
 enum OrderStatus {
   PENDING
   PAID
+  PROCESSING
+  SHIPPED
   FULFILLED
   REFUNDED
   CANCELLED
@@ -66,6 +68,32 @@ enum ExternalPlatform {
   ETSY
 }
 
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum ShippingType {
+  FLAT_RATE
+  FREE
+  WEIGHT_BASED
+  PRICE_BASED
+  LOCAL_PICKUP
+}
+
+enum MessageRole {
+  CUSTOMER
+  VENDOR
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  PROCESSED
+}
+
 // ─── USER ────────────────────────────────────────────────
 
 model User {
@@ -84,6 +112,12 @@ model User {
   pushTokens             PushToken[]
   notificationPreference NotificationPreference?
   passwordResetTokens    PasswordResetToken[]
+  reviews                Review[]
+  wishlistItems          WishlistItem[]
+  savedAddresses         SavedAddress[]
+  sentMessages           Message[]           @relation("SenderMessages")
+  receivedMessages       Message[]           @relation("RecipientMessages")
+  conversations          ConversationParticipant[]
 
   @@map("users")
 }
@@ -99,6 +133,29 @@ model PasswordResetToken {
 
   @@index([token])
   @@map("password_reset_tokens")
+}
+
+// ─── SAVED ADDRESSES ────────────────────────────────────
+
+model SavedAddress {
+  id         String  @id @default(cuid())
+  userId     String
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String  @default("Home")
+  name       String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String  @default("US")
+  phone      String?
+  isDefault  Boolean @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@map("saved_addresses")
 }
 
 // ─── VENDOR ──────────────────────────────────────────────
@@ -120,12 +177,19 @@ model Vendor {
   stripeAccountId   String?
   stripeOnboarded   Boolean      @default(false)
   commissionRate    Float        @default(0.05)
+  vacationMode      Boolean      @default(false)
+  vacationMessage   String?
+  seoTitle          String?
+  seoDescription    String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
   products          Product[]
   orders            Order[]
   vendorConnections VendorConnection[]
+  coupons           Coupon[]
+  shippingProfiles  ShippingProfile[]
+  reviews           Review[]
 
   @@map("vendors")
 }
@@ -149,6 +213,25 @@ model VendorConnection {
   @@map("vendor_connections")
 }
 
+// ─── SHIPPING PROFILES ──────────────────────────────────
+
+model ShippingProfile {
+  id              String       @id @default(cuid())
+  vendorId        String
+  vendor          Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name            String
+  shippingType    ShippingType @default(FLAT_RATE)
+  price           Float        @default(0)
+  freeAbove       Float?
+  estimatedDays   String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([vendorId])
+  @@map("shipping_profiles")
+}
+
 // ─── PRODUCT ─────────────────────────────────────────────
 
 model Product {
@@ -160,21 +243,141 @@ model Product {
   description      String?
   price            Float
   compareAtPrice   Float?
+  sku              String?
+  weight           Float?
+  weightUnit       String?          @default("oz")
   images           String[]
   categoryTags     String[]
   inventory        Int              @default(0)
+  lowStockThreshold Int             @default(5)
   isActive         Boolean          @default(true)
+  isFeatured       Boolean          @default(false)
   externalPlatform ExternalPlatform @default(NATIVE)
   externalId       String?
+  seoTitle         String?
+  seoDescription   String?
   metadata         Json?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  orderItems OrderItem[]
+  orderItems    OrderItem[]
+  variants      ProductVariant[]
+  attributes    ProductAttribute[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
 
   @@index([vendorId])
   @@index([externalPlatform, externalId])
   @@map("products")
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  sku       String?
+  price     Float
+  compareAtPrice Float?
+  inventory Int     @default(0)
+  images    String[]
+  options   Json
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model ProductAttribute {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  values    String[]
+  createdAt DateTime @default(now())
+
+  @@unique([productId, name])
+  @@map("product_attributes")
+}
+
+// ─── REVIEWS ─────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  rating    Int
+  title     String?
+  body      String?
+  images    String[]
+  isVerifiedPurchase Boolean @default(false)
+  isApproved Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([vendorId])
+  @@map("reviews")
+}
+
+// ─── WISHLIST ────────────────────────────────────────────
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("wishlist_items")
+}
+
+// ─── COUPONS ─────────────────────────────────────────────
+
+model Coupon {
+  id             String     @id @default(cuid())
+  vendorId       String?
+  vendor         Vendor?    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  code           String     @unique
+  type           CouponType
+  value          Float
+  minOrderAmount Float?
+  maxUses        Int?
+  usedCount      Int        @default(0)
+  startsAt       DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  redemptions CouponRedemption[]
+
+  @@index([code])
+  @@index([vendorId])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  orderId   String
+  userId    String
+  discount  Float
+  createdAt DateTime @default(now())
+
+  @@unique([couponId, orderId])
+  @@map("coupon_redemptions")
 }
 
 // ─── ORDER ───────────────────────────────────────────────
@@ -190,6 +393,7 @@ model Order {
   subtotal             Float
   tax                  Float       @default(0)
   shipping             Float       @default(0)
+  discount             Float       @default(0)
   total                Float
 
   commissionBaseAmount Float
@@ -201,13 +405,19 @@ model Order {
   orderGroupId         String?
   stripeSessionId      String?     @unique
   stripePaymentIntent  String?     @unique
+  couponCode           String?
+  trackingNumber       String?
+  trackingCarrier      String?
+  shippedAt            DateTime?
+  fulfilledAt          DateTime?
 
   shippingAddress      Json?
   notes                String?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 
-  items OrderItem[]
+  items   OrderItem[]
+  refunds Refund[]
 
   @@index([userId])
   @@index([vendorId])
@@ -216,16 +426,82 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
-  unitPrice Float
-  total     Float
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  variantName String?
+  quantity    Int
+  unitPrice   Float
+  total       Float
 
   @@map("order_items")
+}
+
+// ─── REFUNDS ─────────────────────────────────────────────
+
+model Refund {
+  id               String       @id @default(cuid())
+  orderId          String
+  order            Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount           Float
+  reason           String?
+  status           RefundStatus @default(REQUESTED)
+  stripeRefundId   String?
+  processedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([orderId])
+  @@map("refunds")
+}
+
+// ─── MESSAGING ───────────────────────────────────────────
+
+model Conversation {
+  id           String   @id @default(cuid())
+  subject      String?
+  orderId      String?
+  productId    String?
+  lastMessageAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("SenderMessages", fields: [senderId], references: [id])
+  recipientId    String?
+  recipient      User?        @relation("RecipientMessages", fields: [recipientId], references: [id])
+  body           String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("messages")
 }
 
 // ─── BLOG ────────────────────────────────────────────────

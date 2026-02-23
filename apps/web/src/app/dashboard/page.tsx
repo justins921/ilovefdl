@@ -13,6 +13,9 @@ import {
   Clock,
   TrendingUp,
   BarChart3,
+  Tag,
+  Truck,
+  MessageSquare,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -264,13 +267,61 @@ export default function VendorDashboardPage() {
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
                 </Link>
                 <Link
-                  href="/marketplace"
+                  href="/dashboard/integrations"
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
                 >
                   <div className="flex items-center gap-3">
-                    <ShoppingBag className="w-5 h-5 text-accent" />
+                    <ArrowRight className="w-5 h-5 text-teal rotate-90" />
                     <span className="text-sm font-medium text-primary">
-                      Browse Marketplace
+                      Integrations
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/coupons"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Tag className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Coupons
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/shipping"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Truck className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Shipping Profiles
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/analytics"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Analytics
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/messages"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Messages
                     </span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />

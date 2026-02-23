@@ -8,6 +8,9 @@ export {
   PostCategory,
   DayOfWeek,
   ExternalPlatform,
+  CouponType,
+  ShippingType,
+  RefundStatus,
 } from './types';
 
 export type {
@@ -16,8 +19,19 @@ export type {
   Vendor,
   VendorConnection,
   Product,
+  ProductVariant,
+  ProductAttribute,
   Order,
   OrderItem,
+  Review,
+  WishlistItem,
+  SavedAddress,
+  Coupon,
+  ShippingProfile,
+  Refund,
+  Conversation,
+  ConversationParticipant,
+  Message,
   BlogPost,
   Bar,
   Special,
@@ -28,6 +42,7 @@ export type {
   ShippingAddress,
   BarHours,
   CommissionBreakdown,
+  VendorAnalytics,
 
   // API response types
   ApiResponse,
@@ -43,6 +58,13 @@ export type {
   // Checkout types
   CheckoutLineItem,
   CheckoutSession,
+
+  // Integration / Sync types
+  SyncDirection,
+  ExternalProduct,
+  ImportResult,
+  SyncResult,
+  ConnectionStatus,
 } from './types';
 
 // ─── Validation Schemas ─────────────────────────────────
@@ -54,6 +76,14 @@ export * from './schemas/blog';
 export * from './schemas/bar';
 export * from './schemas/special';
 export * from './schemas/notification';
+export * from './schemas/integration';
+export * from './schemas/review';
+export * from './schemas/coupon';
+export * from './schemas/shipping';
+export * from './schemas/wishlist';
+export * from './schemas/address';
+export * from './schemas/message';
+export * from './schemas/refund';
 
 // ─── API Client ─────────────────────────────────────────
 export { ApiClient, ApiError } from './api-client';

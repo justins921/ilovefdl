@@ -16,6 +16,8 @@ export enum VendorStatus {
 export enum OrderStatus {
   PENDING = 'PENDING',
   PAID = 'PAID',
+  PROCESSING = 'PROCESSING',
+  SHIPPED = 'SHIPPED',
   FULFILLED = 'FULFILLED',
   REFUNDED = 'REFUNDED',
   CANCELLED = 'CANCELLED',
@@ -55,6 +57,27 @@ export enum ExternalPlatform {
   ETSY = 'ETSY',
 }
 
+export enum CouponType {
+  PERCENTAGE = 'PERCENTAGE',
+  FIXED_AMOUNT = 'FIXED_AMOUNT',
+  FREE_SHIPPING = 'FREE_SHIPPING',
+}
+
+export enum ShippingType {
+  FLAT_RATE = 'FLAT_RATE',
+  FREE = 'FREE',
+  WEIGHT_BASED = 'WEIGHT_BASED',
+  PRICE_BASED = 'PRICE_BASED',
+  LOCAL_PICKUP = 'LOCAL_PICKUP',
+}
+
+export enum RefundStatus {
+  REQUESTED = 'REQUESTED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  PROCESSED = 'PROCESSED',
+}
+
 // ─── INTERFACES ──────────────────────────────────────────
 
 export interface User {
@@ -83,12 +106,18 @@ export interface Vendor {
   stripeAccountId: string | null;
   stripeOnboarded: boolean;
   commissionRate: number;
+  vacationMode: boolean;
+  vacationMessage: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
   createdAt: string;
   updatedAt: string;
 
   // Relations (optional, included when populated)
   user?: User;
   products?: Product[];
+  _count?: { products: number; reviews: number };
+  averageRating?: number;
 }
 
 export interface VendorConnection {
@@ -113,18 +142,126 @@ export interface Product {
   description: string | null;
   price: number;
   compareAtPrice: number | null;
+  sku: string | null;
+  weight: number | null;
+  weightUnit: string | null;
   images: string[];
   categoryTags: string[];
   inventory: number;
+  lowStockThreshold: number;
   isActive: boolean;
+  isFeatured: boolean;
   externalPlatform: ExternalPlatform;
   externalId: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 
   // Relations (optional, included when populated)
   vendor?: Vendor;
+  variants?: ProductVariant[];
+  attributes?: ProductAttribute[];
+  reviews?: Review[];
+  averageRating?: number;
+  reviewCount?: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  inventory: number;
+  images: string[];
+  options: Record<string, string>;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductAttribute {
+  id: string;
+  productId: string;
+  name: string;
+  values: string[];
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  userId: string;
+  vendorId: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  images: string[];
+  isVerifiedPurchase: boolean;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  user?: User;
+  product?: Product;
+}
+
+export interface WishlistItem {
+  id: string;
+  userId: string;
+  productId: string;
+  createdAt: string;
+
+  product?: Product;
+}
+
+export interface SavedAddress {
+  id: string;
+  userId: string;
+  label: string;
+  name: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Coupon {
+  id: string;
+  vendorId: string | null;
+  code: string;
+  type: CouponType;
+  value: number;
+  minOrderAmount: number | null;
+  maxUses: number | null;
+  usedCount: number;
+  startsAt: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShippingProfile {
+  id: string;
+  vendorId: string;
+  name: string;
+  shippingType: ShippingType;
+  price: number;
+  freeAbove: number | null;
+  estimatedDays: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Order {
@@ -136,6 +273,7 @@ export interface Order {
   subtotal: number;
   tax: number;
   shipping: number;
+  discount: number;
   total: number;
 
   commissionBaseAmount: number;
@@ -146,6 +284,11 @@ export interface Order {
 
   stripeSessionId: string | null;
   stripePaymentIntent: string | null;
+  couponCode: string | null;
+  trackingNumber: string | null;
+  trackingCarrier: string | null;
+  shippedAt: string | null;
+  fulfilledAt: string | null;
 
   shippingAddress: ShippingAddress | null;
   notes: string | null;
@@ -156,18 +299,67 @@ export interface Order {
   user?: User;
   vendor?: Vendor;
   items?: OrderItem[];
+  refunds?: Refund[];
 }
 
 export interface OrderItem {
   id: string;
   orderId: string;
   productId: string;
+  variantName: string | null;
   quantity: number;
   unitPrice: number;
   total: number;
 
   // Relations (optional, included when populated)
   product?: Product;
+}
+
+export interface Refund {
+  id: string;
+  orderId: string;
+  amount: number;
+  reason: string | null;
+  status: RefundStatus;
+  stripeRefundId: string | null;
+  processedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  subject: string | null;
+  orderId: string | null;
+  productId: string | null;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+
+  participants?: ConversationParticipant[];
+  messages?: Message[];
+  unreadCount?: number;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  conversationId: string;
+  userId: string;
+  lastReadAt: string | null;
+  createdAt: string;
+  user?: User;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  recipientId: string | null;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+
+  sender?: User;
 }
 
 export interface BlogPost {
@@ -269,16 +461,24 @@ export interface BarHours {
 // ─── COMMISSION CALCULATION ─────────────────────────────
 
 export interface CommissionBreakdown {
-  /** The base amount used for commission calculation (typically the subtotal) */
   commissionBaseAmount: number;
-  /** The commission rate as a decimal (e.g. 0.05 for 5%) */
   commissionRate: number;
-  /** The platform's commission: commissionBaseAmount * commissionRate */
   commissionAmount: number;
-  /** What the vendor receives: total - commissionAmount - processorFeeAmount */
   vendorNetAmount: number;
-  /** Stripe/processor fees charged on the transaction */
   processorFeeAmount: number;
+}
+
+// ─── ANALYTICS TYPES ────────────────────────────────────
+
+export interface VendorAnalytics {
+  totalRevenue: number;
+  totalOrders: number;
+  totalProducts: number;
+  averageOrderValue: number;
+  totalCommissionPaid: number;
+  pendingPayouts: number;
+  revenueByMonth: Array<{ month: string; revenue: number; orders: number }>;
+  topProducts: Array<{ productId: string; name: string; revenue: number; quantity: number }>;
 }
 
 // ─── API RESPONSE TYPES ─────────────────────────────────
@@ -336,4 +536,43 @@ export interface CheckoutLineItem {
 export interface CheckoutSession {
   sessionId: string;
   url: string;
+}
+
+// ─── INTEGRATION / SYNC TYPES ──────────────────────────
+
+export type SyncDirection = 'pull' | 'push' | 'both';
+
+export interface ExternalProduct {
+  externalId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  images: string[];
+  inventory: number;
+  sku: string | null;
+  categoryTags: string[];
+  platform: ExternalPlatform;
+}
+
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export interface SyncResult {
+  synced: number;
+  errors: string[];
+  direction: SyncDirection;
+  timestamp: string;
+}
+
+export interface ConnectionStatus {
+  platform: ExternalPlatform;
+  isConnected: boolean;
+  shopDomain: string | null;
+  lastSyncAt: string | null;
+  productCount: number;
 }

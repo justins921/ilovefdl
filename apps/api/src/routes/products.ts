@@ -24,7 +24,7 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const { vendorId, category, search, page, limit } = parsed.data;
+    const { vendorId, category, search, minPrice, maxPrice, sort, featured, page, limit } = parsed.data;
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductWhereInput = {
@@ -43,8 +43,24 @@ router.get('/', async (req: Request, res: Response) => {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        { categoryTags: { has: search } },
       ];
     }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {};
+      if (minPrice !== undefined) (where.price as Record<string, number>).gte = minPrice;
+      if (maxPrice !== undefined) (where.price as Record<string, number>).lte = maxPrice;
+    }
+
+    if (featured) {
+      where.isFeatured = true;
+    }
+
+    // Sort order
+    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+    if (sort === 'price_asc') orderBy = { price: 'asc' };
+    else if (sort === 'price_desc') orderBy = { price: 'desc' };
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -56,7 +72,7 @@ router.get('/', async (req: Request, res: Response) => {
         },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.product.count({ where }),
     ]);
@@ -86,6 +102,9 @@ router.get('/:slug', async (req: Request, res: Response) => {
         vendor: {
           select: { id: true, businessName: true, slug: true, logoUrl: true },
         },
+        variants: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
+        attributes: true,
+        _count: { select: { reviews: true } },
       },
     });
 
@@ -94,7 +113,19 @@ router.get('/:slug', async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ data: product });
+    // Get average rating
+    const ratingAgg = await prisma.review.aggregate({
+      where: { productId: product.id, isApproved: true },
+      _avg: { rating: true },
+    });
+
+    res.json({
+      data: {
+        ...product,
+        averageRating: ratingAgg._avg.rating ?? 0,
+        reviewCount: product._count.reviews,
+      },
+    });
   } catch (error) {
     console.error('Get product error:', error);
     res.status(500).json({ error: 'Failed to fetch product' });

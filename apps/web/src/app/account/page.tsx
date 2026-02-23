@@ -10,6 +10,8 @@ import {
   ArrowRight,
   Heart,
   LogOut,
+  MapPin,
+  MessageSquare,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -126,6 +128,30 @@ export default function AccountPage() {
         {/* Quick Links */}
         <div className="grid sm:grid-cols-2 gap-4">
           <Link
+            href="/wishlist"
+            className="bg-white rounded-xl border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center">
+                <Heart className="w-5 h-5 text-accent" />
+              </div>
+              <span className="font-medium text-primary">My Wishlist</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+          </Link>
+          <Link
+            href="/account/addresses"
+            className="bg-white rounded-xl border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-teal/10 rounded-lg flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-teal" />
+              </div>
+              <span className="font-medium text-primary">Saved Addresses</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+          </Link>
+          <Link
             href="/marketplace"
             className="bg-white rounded-xl border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group"
           >
@@ -138,14 +164,14 @@ export default function AccountPage() {
             <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
           </Link>
           <Link
-            href="/news"
+            href="/messages"
             className="bg-white rounded-xl border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center">
-                <Heart className="w-5 h-5 text-accent" />
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-primary" />
               </div>
-              <span className="font-medium text-primary">Community News</span>
+              <span className="font-medium text-primary">Messages</span>
             </div>
             <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
           </Link>
