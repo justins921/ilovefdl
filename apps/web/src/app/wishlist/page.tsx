@@ -119,11 +119,11 @@ export default function WishlistPage() {
     <div className="min-h-screen bg-light">
       {/* Page Header */}
       <div className="bg-white border-b border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-2">
             My Wishlist
           </h1>
-          <p className="text-primary/60 text-lg">
+          <p className="text-primary/60 text-sm sm:text-lg">
             {wishlistItems.length > 0
               ? `${wishlistItems.length} saved item${wishlistItems.length !== 1 ? 's' : ''}`
               : 'Products you love from local vendors'}
@@ -233,7 +233,7 @@ export default function WishlistPage() {
                       <button
                         onClick={() => handleRemove(item.productId)}
                         disabled={isRemoving}
-                        className="p-2 rounded-lg border border-light text-accent hover:bg-accent/5 transition-colors"
+                        className="p-2.5 rounded-lg border border-light text-accent hover:bg-accent/5 transition-colors"
                         aria-label="Remove from wishlist"
                       >
                         <Heart className="w-4 h-4 fill-current" />

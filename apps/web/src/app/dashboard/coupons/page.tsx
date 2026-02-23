@@ -277,16 +277,16 @@ export default function CouponsPage() {
       {/* Header */}
       <div className="bg-white border-b border-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-primary mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
                 Coupons
               </h1>
-              <p className="text-primary/60">
+              <p className="text-primary/60 text-sm sm:text-base">
                 Create and manage discount coupons for your products
               </p>
             </div>
-            <button onClick={openAddModal} className="btn-primary">
+            <button onClick={openAddModal} className="btn-primary w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Create Coupon
             </button>
@@ -312,28 +312,28 @@ export default function CouponsPage() {
         {coupons.length > 0 ? (
           <div className="bg-white rounded-xl border border-light overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="border-b border-light">
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4">
                       Code
                     </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4 hidden sm:table-cell">
                       Type
                     </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4">
                       Value
                     </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4 hidden md:table-cell">
                       Usage
                     </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4">
                       Status
                     </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4 hidden lg:table-cell">
                       Dates
                     </th>
-                    <th className="text-right text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
+                    <th className="text-right text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 sm:px-6 py-4">
                       Actions
                     </th>
                   </tr>
@@ -348,7 +348,7 @@ export default function CouponsPage() {
                         className="hover:bg-light/50 transition-colors"
                       >
                         {/* Code */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                               <Icon className="w-4 h-4 text-accent" />
@@ -360,14 +360,14 @@ export default function CouponsPage() {
                         </td>
 
                         {/* Type */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4 hidden sm:table-cell">
                           <span className="text-sm text-primary/60">
                             {COUPON_TYPE_LABELS[coupon.type]}
                           </span>
                         </td>
 
                         {/* Value */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4">
                           <span className="text-sm font-medium text-primary">
                             {formatCouponValue(coupon.type, coupon.value)}
                           </span>
@@ -379,7 +379,7 @@ export default function CouponsPage() {
                         </td>
 
                         {/* Usage */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4 hidden md:table-cell">
                           <span className="text-sm text-primary">
                             {coupon.usedCount}
                             {coupon.maxUses != null ? ` / ${coupon.maxUses}` : ''}
@@ -397,7 +397,7 @@ export default function CouponsPage() {
                         </td>
 
                         {/* Status */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.className}`}
                           >
@@ -406,7 +406,7 @@ export default function CouponsPage() {
                         </td>
 
                         {/* Dates */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4 hidden lg:table-cell">
                           <div className="text-xs text-primary/50 space-y-0.5">
                             {coupon.startsAt && (
                               <p>Starts: {formatDate(coupon.startsAt)}</p>
@@ -421,11 +421,11 @@ export default function CouponsPage() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-6 py-4">
+                        <td className="px-4 sm:px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => openEditModal(coupon)}
-                              className="p-2 rounded-lg text-primary/50 hover:text-accent hover:bg-accent/10 transition-colors"
+                              className="p-2.5 rounded-lg text-primary/50 hover:text-accent hover:bg-accent/10 transition-colors"
                               title="Edit coupon"
                             >
                               <Pencil className="w-4 h-4" />
@@ -534,7 +534,7 @@ export default function CouponsPage() {
               </div>
 
               {/* Type + Value */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1.5">
                     Discount Type <span className="text-accent">*</span>
@@ -576,7 +576,7 @@ export default function CouponsPage() {
               </div>
 
               {/* Min Order Amount + Max Uses */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1.5">
                     Minimum Order Amount ($)
@@ -608,7 +608,7 @@ export default function CouponsPage() {
               </div>
 
               {/* Start + Expiry Dates */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1.5">
                     Starts At
@@ -634,18 +634,18 @@ export default function CouponsPage() {
               </div>
 
               {/* Form Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-light">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-light">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-5 py-2.5 text-sm font-medium text-primary/60 hover:text-primary rounded-lg hover:bg-light transition-colors"
+                  className="px-5 py-2.5 text-sm font-medium text-primary/60 hover:text-primary rounded-lg hover:bg-light transition-colors text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed justify-center"
                 >
                   {saving ? (
                     <>

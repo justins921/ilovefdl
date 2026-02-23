@@ -141,10 +141,10 @@ export default function AnalyticsPage() {
       <div className="bg-white border-b border-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div>
-            <h1 className="text-3xl font-bold text-primary mb-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
               Analytics
             </h1>
-            <p className="text-primary/60">
+            <p className="text-primary/60 text-sm sm:text-base">
               Track your store performance and revenue
             </p>
           </div>
@@ -153,23 +153,23 @@ export default function AnalyticsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
               <div
                 key={stat.label}
-                className="bg-white rounded-xl border border-light p-6"
+                className="bg-white rounded-xl border border-light p-4 sm:p-6"
               >
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 sm:gap-3 mb-3">
                   <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.iconBg}`}
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center ${stat.iconBg}`}
                   >
-                    <Icon className={`w-5 h-5 ${stat.iconColor}`} />
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.iconColor}`} />
                   </div>
-                  <span className="text-sm text-primary/60">{stat.label}</span>
+                  <span className="text-xs sm:text-sm text-primary/60">{stat.label}</span>
                 </div>
-                <p className="text-2xl font-bold text-primary">{stat.value}</p>
+                <p className="text-lg sm:text-2xl font-bold text-primary">{stat.value}</p>
               </div>
             );
           })}
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
               </h2>
             </div>
 
-            <div className="flex items-end gap-2 h-64">
+            <div className="flex items-end gap-1 sm:gap-2 h-48 sm:h-64">
               {analytics.revenueByMonth.map((month) => {
                 const heightPercent = (month.revenue / maxRevenue) * 100;
                 return (

@@ -236,7 +236,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
               key={review.id}
               className="bg-white rounded-xl border border-light p-6"
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3 sm:gap-4">
                 {/* Avatar */}
                 <div className="flex-shrink-0">
                   {review.user?.avatarUrl ? (
@@ -361,11 +361,11 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
                     onClick={() => setNewRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className="p-0.5 transition-transform hover:scale-110"
+                    className="p-1.5 transition-transform hover:scale-110"
                     aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
                   >
                     <Star
-                      className={`w-7 h-7 transition-colors ${
+                      className={`w-8 h-8 transition-colors ${
                         star <= (hoverRating || newRating)
                           ? 'text-amber-400 fill-amber-400'
                           : 'text-primary/20'
@@ -423,7 +423,7 @@ export default function ProductReviews({ productId }: ProductReviewsProps) {
             <button
               type="submit"
               disabled={submitting || newRating === 0}
-              className="btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
             >
               {submitting ? (
                 <>

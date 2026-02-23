@@ -227,10 +227,10 @@ export default function MessagesPage() {
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-3xl font-bold text-primary mb-1">
+                <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
                   New Conversation
                 </h1>
-                <p className="text-primary/60">
+                <p className="text-sm sm:text-base text-primary/60">
                   Start a new conversation with a customer or vendor
                 </p>
               </div>
@@ -300,18 +300,18 @@ export default function MessagesPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-light">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-light">
               <button
                 type="button"
                 onClick={backToList}
-                className="px-5 py-2.5 text-sm font-medium text-primary/60 hover:text-primary rounded-lg hover:bg-light transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-primary/60 hover:text-primary rounded-lg hover:bg-light transition-colors text-center"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creatingConversation || !newRecipientId.trim() || !newBody.trim()}
-                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed justify-center"
               >
                 {creatingConversation ? (
                   <>
@@ -350,7 +350,7 @@ export default function MessagesPage() {
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-bold text-primary truncate">
+                <h1 className="text-lg sm:text-xl font-bold text-primary truncate">
                   {getConversationTitle(activeConversation)}
                 </h1>
                 <p className="text-sm text-primary/60">
@@ -402,7 +402,7 @@ export default function MessagesPage() {
                     className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[75%] ${
+                      className={`max-w-[90%] sm:max-w-[75%] ${
                         isMine
                           ? 'order-2'
                           : 'order-1'
@@ -492,16 +492,16 @@ export default function MessagesPage() {
       {/* Header */}
       <div className="bg-white border-b border-light">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-primary mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
                 Messages
               </h1>
-              <p className="text-primary/60">
+              <p className="text-sm sm:text-base text-primary/60">
                 Communicate with customers and resolve inquiries
               </p>
             </div>
-            <button onClick={openNewConversation} className="btn-primary">
+            <button onClick={openNewConversation} className="btn-primary w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               New Conversation
             </button>

@@ -217,7 +217,7 @@ export default function AddressesPage() {
       {/* Header */}
       <div className="bg-white border-b border-light">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Link
@@ -230,14 +230,14 @@ export default function AddressesPage() {
                   Account
                 </span>
               </div>
-              <h1 className="text-3xl font-bold text-primary mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
                 Saved Addresses
               </h1>
               <p className="text-primary/60">
                 Manage your shipping and billing addresses.
               </p>
             </div>
-            <button onClick={openAddModal} className="btn-primary text-sm">
+            <button onClick={openAddModal} className="btn-primary text-sm w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Add Address
             </button>
@@ -304,7 +304,7 @@ export default function AddressesPage() {
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t border-light">
                   <button
                     onClick={() => openEditModal(address)}
-                    className="btn-outline text-xs px-3 py-1.5"
+                    className="btn-outline text-xs px-3 py-2"
                   >
                     <Pencil className="w-3.5 h-3.5 mr-1.5" />
                     Edit
@@ -312,7 +312,7 @@ export default function AddressesPage() {
                   <button
                     onClick={() => handleDelete(address.id)}
                     disabled={deletingId === address.id}
-                    className="btn-outline text-xs px-3 py-1.5 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
+                    className="btn-outline text-xs px-3 py-2 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
                   >
                     {deletingId === address.id ? (
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -437,7 +437,7 @@ export default function AddressesPage() {
               </div>
 
               {/* City + State row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-primary/60 uppercase tracking-wider mb-1.5">
                     City *
@@ -469,7 +469,7 @@ export default function AddressesPage() {
               </div>
 
               {/* Postal code + Country row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-primary/60 uppercase tracking-wider mb-1.5">
                     Postal Code *
@@ -534,7 +534,7 @@ export default function AddressesPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-light">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-light">
                 <button
                   type="button"
                   onClick={closeModal}
