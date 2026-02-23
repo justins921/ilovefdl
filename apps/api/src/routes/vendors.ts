@@ -14,8 +14,16 @@ router.get('/', async (_req: Request, res: Response) => {
   try {
     const vendors = await prisma.vendor.findMany({
       where: { status: 'APPROVED' },
-      include: {
-        user: { select: { name: true, email: true, avatarUrl: true } },
+      select: {
+        id: true,
+        businessName: true,
+        slug: true,
+        description: true,
+        logoUrl: true,
+        bannerUrl: true,
+        status: true,
+        createdAt: true,
+        user: { select: { name: true, avatarUrl: true } },
         _count: { select: { products: true } },
       },
       orderBy: { businessName: 'asc' },
@@ -36,8 +44,16 @@ router.get('/:slug', async (req: Request, res: Response) => {
   try {
     const vendor = await prisma.vendor.findUnique({
       where: { slug: req.params.slug },
-      include: {
-        user: { select: { name: true, email: true, avatarUrl: true } },
+      select: {
+        id: true,
+        businessName: true,
+        slug: true,
+        description: true,
+        logoUrl: true,
+        bannerUrl: true,
+        status: true,
+        createdAt: true,
+        user: { select: { name: true, avatarUrl: true } },
         products: {
           where: { isActive: true },
           orderBy: { createdAt: 'desc' },
@@ -96,11 +112,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       },
     });
 
-    // Update user role to VENDOR
-    await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { role: 'VENDOR' },
-    });
+    // Role is upgraded to VENDOR only after admin approves (see admin routes)
 
     res.status(201).json({ data: vendor });
   } catch (error) {

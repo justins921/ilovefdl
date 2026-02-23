@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { saveAbandonedCartSchema } from '@ilovefdl/shared';
 import prisma from '../utils/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
@@ -18,6 +19,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         email: parsed.data.email ?? req.user!.email,
         items: parsed.data.items,
         subtotal: parsed.data.subtotal,
+        recoveryToken: crypto.randomBytes(32).toString('hex'),
       },
     });
     res.status(201).json({ data: cart });
@@ -34,7 +36,15 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'VENDOR']), async (req: Reque
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
 
-    const where = { isRecovered: false };
+    const where: Record<string, unknown> = { isRecovered: false };
+
+    // Vendors can only see abandoned carts — admin sees all
+    if (req.user!.role === 'VENDOR') {
+      const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+      if (!vendor) { res.status(403).json({ error: 'Vendor profile not found' }); return; }
+      // Filter carts that contain products from this vendor's store
+      where.userId = { in: (await prisma.order.findMany({ where: { vendorId: vendor.id }, select: { userId: true }, distinct: ['userId'] })).map(o => o.userId) };
+    }
 
     const [carts, total] = await Promise.all([
       prisma.abandonedCart.findMany({

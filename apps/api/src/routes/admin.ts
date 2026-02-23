@@ -1,6 +1,15 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import prisma from '../utils/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+
+const vendorStatusSchema = z.object({
+  status: z.enum(['PENDING', 'APPROVED', 'SUSPENDED']),
+});
+
+const orderStatusSchema = z.object({
+  status: z.enum(['PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'FULFILLED', 'REFUNDED', 'CANCELLED']),
+});
 
 const router = Router();
 
@@ -29,18 +38,25 @@ router.get('/vendors', requireAuth, requireRole(['ADMIN']), async (req: Request,
 // PUT /admin/vendors/:id/status — approve/suspend vendor
 router.put('/vendors/:id/status', requireAuth, requireRole(['ADMIN']), async (req: Request, res: Response) => {
   try {
-    const { status } = req.body as { status: string };
-    if (!['PENDING', 'APPROVED', 'SUSPENDED'].includes(status)) {
-      res.status(400).json({ error: 'Invalid status' }); return;
-    }
+    const parsed = vendorStatusSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }
+    const { status } = parsed.data;
+
     const vendor = await prisma.vendor.findUnique({ where: { id: req.params.id } });
     if (!vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
 
     const updated = await prisma.vendor.update({
       where: { id: req.params.id },
-      data: { status: status as 'PENDING' | 'APPROVED' | 'SUSPENDED' },
+      data: { status },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+
+    // Grant VENDOR role when approved, revert to USER when suspended
+    if (status === 'APPROVED') {
+      await prisma.user.update({ where: { id: vendor.userId }, data: { role: 'VENDOR' } });
+    } else if (status === 'SUSPENDED') {
+      await prisma.user.update({ where: { id: vendor.userId }, data: { role: 'USER' } });
+    }
 
     res.json({ data: updated });
   } catch (error) {
@@ -84,11 +100,9 @@ router.get('/orders', requireAuth, requireRole(['ADMIN']), async (req: Request, 
 // PUT /admin/orders/:id/status — update order status (admin)
 router.put('/orders/:id/status', requireAuth, requireRole(['ADMIN']), async (req: Request, res: Response) => {
   try {
-    const { status } = req.body as { status: string };
-    const validStatuses = ['PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'FULFILLED', 'REFUNDED', 'CANCELLED'];
-    if (!validStatuses.includes(status)) {
-      res.status(400).json({ error: 'Invalid status' }); return;
-    }
+    const parsed = orderStatusSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }
+    const { status } = parsed.data;
 
     const updateData: Record<string, unknown> = { status };
     if (status === 'SHIPPED') updateData.shippedAt = new Date();

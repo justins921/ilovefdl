@@ -329,7 +329,15 @@ router.post('/checkout/multi', requireAuth, async (req: Request, res: Response) 
  */
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const where = req.user!.role === 'ADMIN' ? {} : { userId: req.user!.id };
+    let where: Record<string, unknown> = { userId: req.user!.id };
+    if (req.user!.role === 'ADMIN') {
+      where = {};
+    } else if (req.user!.role === 'VENDOR') {
+      const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+      if (vendor) {
+        where = { OR: [{ userId: req.user!.id }, { vendorId: vendor.id }] };
+      }
+    }
 
     const orders = await prisma.order.findMany({
       where,
@@ -385,8 +393,13 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Only order owner or admin can view
-    if (order.userId !== req.user!.id && req.user!.role !== 'ADMIN') {
+    // Order owner, vendor owner, or admin can view
+    let canView = order.userId === req.user!.id || req.user!.role === 'ADMIN';
+    if (!canView && req.user!.role === 'VENDOR') {
+      const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+      if (vendor && order.vendorId === vendor.id) canView = true;
+    }
+    if (!canView) {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }

@@ -29,6 +29,16 @@ const FROM_ADDRESS =
 const BRAND_COLOR = '#1a2332';
 const BRAND_ACCENT = '#2563eb';
 
+/** Escape HTML special characters to prevent XSS in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function wrapHtml(title: string, bodyContent: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -184,7 +194,7 @@ export async function sendOrderConfirmation(
     .map(
       (item) => `
       <tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;">${item.name}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;">${escapeHtml(item.name)}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:center;">${item.quantity}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:right;">${formatCurrency(item.unitPrice)}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:right;">${formatCurrency(item.unitPrice * item.quantity)}</td>
@@ -258,13 +268,13 @@ export async function sendShippingUpdate(
       <tr>
         <td style="padding:16px 20px;">
           <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Carrier</p>
-          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${order.trackingCarrier}</p>
+          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${escapeHtml(order.trackingCarrier)}</p>
         </td>
       </tr>
       <tr>
         <td style="padding:0 20px 16px;">
           <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Tracking Number</p>
-          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;font-family:monospace;">${order.trackingNumber}</p>
+          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;font-family:monospace;">${escapeHtml(order.trackingNumber)}</p>
         </td>
       </tr>
     </table>
@@ -295,7 +305,7 @@ export async function sendWelcomeEmail(
   const body = `
     <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">Welcome to I Love FDL!</h2>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
-      Hi ${name},
+      Hi ${escapeHtml(name)},
     </p>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
       Thanks for joining I Love FDL! We&rsquo;re thrilled to have you as part of our community supporting local businesses in Fond du Lac.
@@ -393,7 +403,7 @@ export async function sendVendorApproval(
   const body = `
     <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">Congratulations!</h2>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
-      Great news &mdash; your vendor application for <strong>${vendorName}</strong> has been approved!
+      Great news &mdash; your vendor application for <strong>${escapeHtml(vendorName)}</strong> has been approved!
     </p>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
       You can now start listing your products on I Love FDL. Here&rsquo;s what to do next:
@@ -406,7 +416,7 @@ export async function sendVendorApproval(
     </ol>
     ${buttonHtml(`${appUrl}/vendor/dashboard`, 'Go to Vendor Dashboard')}
     <p style="color:#4b5563;line-height:1.6;font-size:15px;margin-top:16px;">
-      We&rsquo;re excited to have ${vendorName} as part of the I Love FDL marketplace. Welcome aboard!
+      We&rsquo;re excited to have ${escapeHtml(vendorName)} as part of the I Love FDL marketplace. Welcome aboard!
     </p>`;
 
   const text = `Your vendor application has been approved!\n\nCongratulations! Your vendor application for ${vendorName} has been approved.\n\nYou can now log in to your vendor dashboard to start listing products.\n\nVisit ${appUrl}/vendor/dashboard to get started.`;
@@ -441,8 +451,8 @@ export async function sendCartRecoveryEmail(
       (item) => `
       <tr>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;">
-          ${item.image ? `<img src="${item.image}" alt="${item.name}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;" />` : ''}
-          ${item.name}
+          ${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;" />` : ''}
+          ${escapeHtml(item.name)}
         </td>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:center;">${item.quantity}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;font-size:14px;text-align:right;">${formatCurrency(item.price)}</td>
@@ -509,12 +519,12 @@ export async function sendGiftCardEmail(
   const body = `
     <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">You&rsquo;ve received a gift card!</h2>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
-      Hi ${gift.recipientName},
+      Hi ${escapeHtml(gift.recipientName)},
     </p>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
-      ${gift.senderName} has sent you an I Love FDL gift card!
+      ${escapeHtml(gift.senderName)} has sent you an I Love FDL gift card!
     </p>
-    ${gift.message ? `<div style="margin:20px 0;padding:16px 20px;background-color:#f9fafb;border-radius:6px;border-left:4px solid ${BRAND_ACCENT};"><p style="color:#4b5563;font-size:15px;margin:0;font-style:italic;">&ldquo;${gift.message}&rdquo;</p></div>` : ''}
+    ${gift.message ? `<div style="margin:20px 0;padding:16px 20px;background-color:#f9fafb;border-radius:6px;border-left:4px solid ${BRAND_ACCENT};"><p style="color:#4b5563;font-size:15px;margin:0;font-style:italic;">&ldquo;${escapeHtml(gift.message)}&rdquo;</p></div>` : ''}
     <div style="margin:24px 0;padding:24px;background-color:#f0fdf4;border-radius:8px;text-align:center;">
       <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Gift Card Value</p>
       <p style="margin:0 0 16px;color:#059669;font-size:32px;font-weight:700;">${formatCurrency(gift.amount)}</p>
@@ -562,7 +572,7 @@ export async function sendSubscriptionReminderEmail(
       <tr>
         <td style="padding:16px 20px;">
           <p style="margin:0 0 8px;color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;">Product</p>
-          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${data.productName} x${data.quantity}</p>
+          <p style="margin:0;color:#1a1a1a;font-size:16px;font-weight:600;">${escapeHtml(data.productName)} x${data.quantity}</p>
         </td>
       </tr>
       <tr>
@@ -611,7 +621,7 @@ export async function sendLoyaltyPointsEmail(
   const body = `
     <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:22px;">You earned rewards points!</h2>
     <p style="color:#4b5563;line-height:1.6;font-size:15px;">
-      Hi ${name}, you just earned <strong>${pointsEarned} points</strong> from your purchase!
+      Hi ${escapeHtml(name)}, you just earned <strong>${pointsEarned} points</strong> from your purchase!
     </p>
     <div style="margin:24px 0;padding:24px;background-color:#f0fdf4;border-radius:8px;text-align:center;">
       <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">Points Earned</p>
