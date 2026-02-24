@@ -398,6 +398,11 @@ export class ApiClient {
     return this.put<ApiResponse<Special>>(`/specials/${id}`, data);
   }
 
+  /** Delete a special */
+  async deleteSpecial(id: string): Promise<void> {
+    return this.delete(`/specials/${id}`);
+  }
+
   // ─── PUSH NOTIFICATIONS ──────────────────────────────
 
   /** Register a push notification token for the current user */

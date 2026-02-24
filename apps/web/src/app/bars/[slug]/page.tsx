@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -13,8 +13,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Loader2,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { useAuth } from '@/components/AuthProvider';
 import SpecialCard from '@/components/SpecialCard';
 import { DayOfWeek } from '@ilovefdl/shared';
 import type { Bar, Special } from '@ilovefdl/shared';
@@ -34,6 +40,7 @@ export default function BarDetailPage({
 }: {
   params: { slug: string };
 }) {
+  const { user } = useAuth();
   const [bar, setBar] = useState<Bar | null>(null);
   const [specials, setSpecials] = useState<Special[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,17 +50,39 @@ export default function BarDetailPage({
     return days[new Date().getDay()];
   });
 
+  // Special management state
+  const [showSpecialModal, setShowSpecialModal] = useState(false);
+  const [editingSpecial, setEditingSpecial] = useState<Special | null>(null);
+  const [savingSpecial, setSavingSpecial] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [specialError, setSpecialError] = useState('');
+
+  // Special form state
+  const [specialDay, setSpecialDay] = useState<DayOfWeek>(DayOfWeek.MONDAY);
+  const [specialTitle, setSpecialTitle] = useState('');
+  const [specialDescription, setSpecialDescription] = useState('');
+  const [specialPrice, setSpecialPrice] = useState('');
+  const [specialStartTime, setSpecialStartTime] = useState('');
+  const [specialEndTime, setSpecialEndTime] = useState('');
+  const [specialIsFeatured, setSpecialIsFeatured] = useState(false);
+
+  const canManage = user?.role === 'ADMIN' || (bar?.ownerId != null && bar.ownerId === user?.id);
+
+  const fetchSpecials = useCallback(async (barId: string) => {
+    try {
+      const specialsRes = await api.getSpecials({ barId, limit: 50 });
+      setSpecials(specialsRes.data);
+    } catch {
+      setSpecials([]);
+    }
+  }, []);
+
   useEffect(() => {
     async function fetchData() {
       try {
         const barRes = await api.getBar(params.slug);
         setBar(barRes.data);
-
-        const specialsRes = await api.getSpecials({
-          barId: barRes.data.id,
-          limit: 50,
-        });
-        setSpecials(specialsRes.data);
+        await fetchSpecials(barRes.data.id);
       } catch {
         setBar(null);
       } finally {
@@ -61,7 +90,86 @@ export default function BarDetailPage({
       }
     }
     fetchData();
-  }, [params.slug]);
+  }, [params.slug, fetchSpecials]);
+
+  function resetSpecialForm() {
+    setSpecialDay(activeDay as DayOfWeek);
+    setSpecialTitle('');
+    setSpecialDescription('');
+    setSpecialPrice('');
+    setSpecialStartTime('');
+    setSpecialEndTime('');
+    setSpecialIsFeatured(false);
+    setSpecialError('');
+  }
+
+  function openCreateSpecial() {
+    setEditingSpecial(null);
+    resetSpecialForm();
+    setShowSpecialModal(true);
+  }
+
+  function openEditSpecial(special: Special) {
+    setEditingSpecial(special);
+    setSpecialDay(special.dayOfWeek);
+    setSpecialTitle(special.title);
+    setSpecialDescription(special.description ?? '');
+    setSpecialPrice(special.price ?? '');
+    setSpecialStartTime(special.startTime ?? '');
+    setSpecialEndTime(special.endTime ?? '');
+    setSpecialIsFeatured(special.isFeatured);
+    setSpecialError('');
+    setShowSpecialModal(true);
+  }
+
+  async function handleSaveSpecial(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bar) return;
+    setSavingSpecial(true);
+    setSpecialError('');
+
+    try {
+      const data = {
+        barId: bar.id,
+        dayOfWeek: specialDay,
+        title: specialTitle,
+        description: specialDescription || undefined,
+        price: specialPrice || undefined,
+        startTime: specialStartTime || undefined,
+        endTime: specialEndTime || undefined,
+        isFeatured: specialIsFeatured,
+        isActive: true,
+      };
+
+      if (editingSpecial) {
+        const { barId: _, ...updateData } = data;
+        await api.updateSpecial(editingSpecial.id, updateData);
+      } else {
+        await api.createSpecial(data);
+      }
+
+      setShowSpecialModal(false);
+      resetSpecialForm();
+      await fetchSpecials(bar.id);
+    } catch (err: any) {
+      setSpecialError(err?.message || 'Failed to save special.');
+    } finally {
+      setSavingSpecial(false);
+    }
+  }
+
+  async function handleDeleteSpecial(specialId: string) {
+    if (!bar || !confirm('Delete this special?')) return;
+    setDeletingId(specialId);
+    try {
+      await api.deleteSpecial(specialId);
+      await fetchSpecials(bar.id);
+    } catch {
+      // silently fail
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -180,9 +288,20 @@ export default function BarDetailPage({
 
             {/* Weekly Specials */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-primary mb-6">
-                Weekly Specials
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-primary">
+                  Weekly Specials
+                </h2>
+                {canManage && (
+                  <button
+                    onClick={openCreateSpecial}
+                    className="btn-primary flex items-center gap-2 text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Special
+                  </button>
+                )}
+              </div>
 
               {/* Day Tabs */}
               <div className="flex gap-1 overflow-x-auto pb-4 mb-6 scrollbar-hide">
@@ -205,16 +324,49 @@ export default function BarDetailPage({
               {filteredSpecials.length > 0 ? (
                 <div className="grid gap-4">
                   {filteredSpecials.map((special) => (
-                    <SpecialCard key={special.id} special={special} />
+                    <div key={special.id} className="relative group">
+                      <SpecialCard special={special} />
+                      {canManage && (
+                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEditSpecial(special)}
+                            className="w-8 h-8 bg-white rounded-lg shadow border border-light flex items-center justify-center text-primary/50 hover:text-primary transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSpecial(special.id)}
+                            disabled={deletingId === special.id}
+                            className="w-8 h-8 bg-white rounded-lg shadow border border-light flex items-center justify-center text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                            title="Delete"
+                          >
+                            {deletingId === special.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-12 bg-white rounded-xl border border-light">
                   <Star className="w-10 h-10 text-primary/20 mx-auto mb-3" />
-                  <p className="text-primary/60">
+                  <p className="text-primary/60 mb-3">
                     No specials listed for{' '}
                     {daysOfWeek.find((d) => d.value === activeDay)?.label || 'this day'}.
                   </p>
+                  {canManage && (
+                    <button
+                      onClick={openCreateSpecial}
+                      className="text-sm text-teal hover:underline font-medium"
+                    >
+                      Add a special for this day
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -318,6 +470,153 @@ export default function BarDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Add/Edit Special Modal */}
+      {showSpecialModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-primary">
+                {editingSpecial ? 'Edit Special' : 'Add Special'}
+              </h3>
+              <button
+                onClick={() => setShowSpecialModal(false)}
+                className="text-primary/40 hover:text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSpecial} className="space-y-4">
+              {/* Day of Week */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Day of Week
+                </label>
+                <select
+                  value={specialDay}
+                  onChange={(e) => setSpecialDay(e.target.value as DayOfWeek)}
+                  className="input-field w-full"
+                >
+                  {daysOfWeek.map((day) => (
+                    <option key={day.value} value={day.value}>
+                      {day.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={specialTitle}
+                  onChange={(e) => setSpecialTitle(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="e.g. Half-Price Wings"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Description <span className="text-primary/40">(optional)</span>
+                </label>
+                <textarea
+                  value={specialDescription}
+                  onChange={(e) => setSpecialDescription(e.target.value)}
+                  className="input-field w-full h-20 resize-y"
+                  placeholder="Describe the special..."
+                />
+              </div>
+
+              {/* Price */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Price <span className="text-primary/40">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={specialPrice}
+                  onChange={(e) => setSpecialPrice(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="$5.00"
+                />
+              </div>
+
+              {/* Time row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    value={specialStartTime}
+                    onChange={(e) => setSpecialStartTime(e.target.value)}
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    value={specialEndTime}
+                    onChange={(e) => setSpecialEndTime(e.target.value)}
+                    className="input-field w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Is Featured */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="specialFeatured"
+                  checked={specialIsFeatured}
+                  onChange={(e) => setSpecialIsFeatured(e.target.checked)}
+                  className="w-4 h-4 rounded border-light text-primary focus:ring-primary"
+                />
+                <label htmlFor="specialFeatured" className="text-sm font-medium text-primary">
+                  Featured special
+                </label>
+              </div>
+
+              {specialError && (
+                <div className="p-3 bg-accent/5 border border-accent/20 rounded-lg text-accent text-sm">
+                  {specialError}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-light">
+                <button
+                  type="button"
+                  onClick={() => setShowSpecialModal(false)}
+                  className="btn-outline"
+                  disabled={savingSpecial}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex items-center gap-2"
+                  disabled={savingSpecial || !specialTitle}
+                >
+                  {savingSpecial && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {editingSpecial ? 'Update Special' : 'Add Special'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
