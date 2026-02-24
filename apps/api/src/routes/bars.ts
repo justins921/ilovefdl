@@ -2,19 +2,32 @@ import { Router, Request, Response } from 'express';
 import { createBarSchema, updateBarSchema } from '@ilovefdl/shared';
 import prisma from '../utils/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { DayOfWeek } from '@prisma/client';
 
 const router = Router();
 
+function getTodayDayOfWeek(): DayOfWeek {
+  const days: DayOfWeek[] = [
+    'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY',
+  ];
+  return days[new Date().getDay()];
+}
+
 /**
  * GET /bars
- * List active bars
+ * List active bars with today's specials
  */
 router.get('/', async (_req: Request, res: Response) => {
   try {
+    const today = getTodayDayOfWeek();
+
     const bars = await prisma.bar.findMany({
       where: { isActive: true },
       include: {
-        _count: { select: { specials: true } },
+        specials: {
+          where: { isActive: true, dayOfWeek: today },
+          select: { id: true },
+        },
       },
       orderBy: { name: 'asc' },
     });

@@ -58,7 +58,7 @@ export default function SpecialsScreen() {
 
   const fetchSpecials = useCallback(async (day: DayOfWeek) => {
     try {
-      const res = await api.getSpecials({ dayOfWeek: day, limit: 100 });
+      const res = await api.getSpecials({ day, limit: 100 });
       setSpecials(res.data);
     } catch (error) {
       console.error('Failed to load specials:', error);

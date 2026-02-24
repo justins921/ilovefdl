@@ -378,7 +378,7 @@ export class ApiClient {
 
   /** List specials for a bar, optionally filtered by day */
   async getSpecials(
-    params?: PaginationParams & { barId?: string; dayOfWeek?: string },
+    params?: PaginationParams & { barId?: string; day?: string },
   ): Promise<PaginatedResponse<Special>> {
     return this.get<PaginatedResponse<Special>>('/specials', params as Record<string, string | number | boolean | undefined>);
   }

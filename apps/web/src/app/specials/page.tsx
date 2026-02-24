@@ -41,7 +41,7 @@ export default function SpecialsPage() {
     setLoading(true);
     try {
       const res: PaginatedResponse<Special> = await api.getSpecials({
-        dayOfWeek: activeDay,
+        day: activeDay,
         limit: 50,
       });
       setSpecials(res.data);
@@ -83,10 +83,14 @@ export default function SpecialsPage() {
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
-            Today&apos;s Specials
+            {activeDay === todayDay
+              ? "Today\u0027s Specials"
+              : `${daysOfWeek.find((d) => d.value === activeDay)?.label || ''} Specials`}
           </h1>
           <p className="text-white/80 text-lg">
-            The best food and drink deals in Fond du Lac, happening right now
+            {activeDay === todayDay
+              ? 'The best food and drink deals in Fond du Lac, happening right now'
+              : `Specials for ${daysOfWeek.find((d) => d.value === activeDay)?.label || ''} in Fond du Lac`}
           </p>
         </div>
       </div>
