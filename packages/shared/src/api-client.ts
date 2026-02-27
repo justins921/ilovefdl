@@ -863,4 +863,38 @@ export class ApiClient {
   }): Promise<ApiResponse<Array<{ carrier: string; service: string; rate: number; estimatedDays: string }>>> {
     return this.post('/shipping/rates', data);
   }
+
+  // ─── UPLOADS ──────────────────────────────────────────
+
+  /** Upload one or more images, returns array of paths */
+  async uploadImages(files: File[]): Promise<ApiResponse<string[]>> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('images', file);
+    }
+
+    const url = `${this.baseUrl}/uploads/images`;
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorBody;
+      try {
+        errorBody = await response.json();
+      } catch {
+        errorBody = { error: 'UploadFailed', message: `Upload failed with status ${response.status}`, statusCode: response.status };
+      }
+      throw new ApiError(errorBody);
+    }
+
+    return (await response.json()) as ApiResponse<string[]>;
+  }
 }

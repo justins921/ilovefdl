@@ -1,11 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { Search, Beer, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import { Search, Beer, ChevronLeft, ChevronRight, Tag, Map, LayoutGrid } from 'lucide-react';
 import BarCard from '@/components/BarCard';
 import api from '@/lib/api';
 import type { Bar, PaginatedResponse } from '@ilovefdl/shared';
+
+const BarMap = dynamic(() => import('@/components/BarMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-xl border border-light bg-white animate-pulse" style={{ minHeight: 400 }} />
+  ),
+});
 
 export default function BarsPage() {
   const [bars, setBars] = useState<Bar[]>([]);
@@ -14,6 +22,7 @@ export default function BarsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [view, setView] = useState<'grid' | 'map'>('grid');
 
   const fetchBars = useCallback(async () => {
     setLoading(true);
@@ -68,19 +77,46 @@ export default function BarsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search */}
-        <form onSubmit={handleSearch} className="mb-8">
-          <div className="relative max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search bars and restaurants..."
-              className="input-field pl-12"
-            />
+        {/* Search + View Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
+          <form onSubmit={handleSearch} className="flex-1">
+            <div className="relative max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search bars and restaurants..."
+                className="input-field pl-12"
+              />
+            </div>
+          </form>
+
+          <div className="flex items-center gap-1 bg-white rounded-lg border border-light p-1">
+            <button
+              onClick={() => setView('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                view === 'grid'
+                  ? 'bg-teal text-white'
+                  : 'text-primary/60 hover:text-primary'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Grid
+            </button>
+            <button
+              onClick={() => setView('map')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                view === 'map'
+                  ? 'bg-teal text-white'
+                  : 'text-primary/60 hover:text-primary'
+              }`}
+            >
+              <Map className="w-4 h-4" />
+              Map
+            </button>
           </div>
-        </form>
+        </div>
 
         {/* Results Count */}
         <div className="mb-6">
@@ -91,49 +127,60 @@ export default function BarsPage() {
           </p>
         </div>
 
+        {/* Map View */}
+        {view === 'map' && !loading && bars.length > 0 && (
+          <div className="mb-8">
+            <BarMap bars={bars} />
+          </div>
+        )}
+
         {/* Bar Grid */}
-        {loading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card animate-pulse">
-                <div className="aspect-[16/10] bg-white" />
-                <div className="p-5 space-y-3">
-                  <div className="h-5 bg-light rounded w-1/2" />
-                  <div className="h-3 bg-light rounded w-full" />
-                  <div className="h-3 bg-light rounded w-1/3" />
-                </div>
+        {view === 'grid' && (
+          <>
+            {loading ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="card animate-pulse">
+                    <div className="aspect-[16/10] bg-white" />
+                    <div className="p-5 space-y-3">
+                      <div className="h-5 bg-light rounded w-1/2" />
+                      <div className="h-3 bg-light rounded w-full" />
+                      <div className="h-3 bg-light rounded w-1/3" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : bars.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {bars.map((bar) => (
-              <BarCard key={bar.id} bar={bar} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <Beer className="w-16 h-16 text-primary/20 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-primary mb-2">
-              No Bars Found
-            </h3>
-            <p className="text-primary/60 mb-6">
-              {search
-                ? `No results for "${search}". Try a different search.`
-                : 'Check back soon for new listings.'}
-            </p>
-            {search && (
-              <button
-                onClick={() => {
-                  setSearch('');
-                  setPage(1);
-                }}
-                className="btn-secondary"
-              >
-                Clear Search
-              </button>
+            ) : bars.length > 0 ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {bars.map((bar) => (
+                  <BarCard key={bar.id} bar={bar} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <Beer className="w-16 h-16 text-primary/20 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-primary mb-2">
+                  No Bars Found
+                </h3>
+                <p className="text-primary/60 mb-6">
+                  {search
+                    ? `No results for "${search}". Try a different search.`
+                    : 'Check back soon for new listings.'}
+                </p>
+                {search && (
+                  <button
+                    onClick={() => {
+                      setSearch('');
+                      setPage(1);
+                    }}
+                    className="btn-secondary"
+                  >
+                    Clear Search
+                  </button>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Pagination */}

@@ -32,6 +32,8 @@ export const createBarSchema = z.object({
     .max(128, 'Slug must be at most 128 characters')
     .regex(slugRegex, 'Slug must contain only lowercase letters, numbers, and hyphens'),
   address: z.string().min(1, 'Address is required').max(500),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
   description: z
     .string()
     .max(2000, 'Description must be at most 2000 characters')
@@ -41,7 +43,7 @@ export const createBarSchema = z.object({
   mapLink: optionalUrl,
   hours: barHoursSchema.optional(),
   photos: z
-    .array(z.string().url('Each photo must be a valid URL'))
+    .array(z.string())
     .max(20, 'Maximum of 20 photos allowed')
     .default([]),
   socialLinks: z.record(z.string(), z.string()).optional(),

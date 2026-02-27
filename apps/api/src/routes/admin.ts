@@ -130,7 +130,7 @@ router.get('/users', requireAuth, requireRole(['ADMIN']), async (req: Request, r
   try {
     const { page = '1', limit = '50', role } = req.query as Record<string, string>;
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const where = role ? { role: role as 'ADMIN' | 'VENDOR' | 'EDITOR' | 'USER' } : {};
+    const where = role ? { role: role as 'ADMIN' | 'VENDOR' | 'BAR_OWNER' | 'CONTRACTOR' | 'EDITOR' | 'USER' } : {};
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({

@@ -69,12 +69,12 @@ router.get('/:slug', async (req: Request, res: Response) => {
 
 /**
  * POST /bars
- * Create bar (admin only)
+ * Create bar (admin or bar owner)
  */
 router.post(
   '/',
   requireAuth,
-  requireRole(['ADMIN']),
+  requireRole(['ADMIN', 'BAR_OWNER']),
   async (req: Request, res: Response) => {
     try {
       const parsed = createBarSchema.safeParse(req.body);

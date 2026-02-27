@@ -3,6 +3,8 @@
 export enum Role {
   ADMIN = 'ADMIN',
   VENDOR = 'VENDOR',
+  BAR_OWNER = 'BAR_OWNER',
+  CONTRACTOR = 'CONTRACTOR',
   EDITOR = 'EDITOR',
   USER = 'USER',
 }
@@ -426,6 +428,8 @@ export interface Bar {
   slug: string;
   description: string | null;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
   mapLink: string | null;
   phone: string | null;
   website: string | null;

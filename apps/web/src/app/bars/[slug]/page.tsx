@@ -18,10 +18,12 @@ import {
   Trash2,
   X,
   Loader2,
+  Camera,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import SpecialCard from '@/components/SpecialCard';
+import ImageUpload from '@/components/ImageUpload';
 import { DayOfWeek } from '@ilovefdl/shared';
 import type { Bar, Special } from '@ilovefdl/shared';
 
@@ -65,6 +67,11 @@ export default function BarDetailPage({
   const [specialStartTime, setSpecialStartTime] = useState('');
   const [specialEndTime, setSpecialEndTime] = useState('');
   const [specialIsFeatured, setSpecialIsFeatured] = useState(false);
+
+  // Photo management state
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [barPhotos, setBarPhotos] = useState<string[]>([]);
+  const [savingPhotos, setSavingPhotos] = useState(false);
 
   const canManage = user?.role === 'ADMIN' || (bar?.ownerId != null && bar.ownerId === user?.id);
 
@@ -171,6 +178,25 @@ export default function BarDetailPage({
     }
   }
 
+  function openPhotoModal() {
+    setBarPhotos(bar?.photos ?? []);
+    setShowPhotoModal(true);
+  }
+
+  async function handleSavePhotos() {
+    if (!bar) return;
+    setSavingPhotos(true);
+    try {
+      await api.updateBar(bar.id, { photos: barPhotos });
+      setBar({ ...bar, photos: barPhotos });
+      setShowPhotoModal(false);
+    } catch {
+      // silently fail
+    } finally {
+      setSavingPhotos(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-light">
@@ -261,6 +287,15 @@ export default function BarDetailPage({
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-teal/30">
             <Beer className="w-24 h-24 text-white/20" />
           </div>
+        )}
+        {canManage && (
+          <button
+            onClick={openPhotoModal}
+            className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-white/90 rounded-lg shadow text-sm font-medium text-primary hover:bg-white transition-colors"
+          >
+            <Camera className="w-4 h-4" />
+            Manage Photos
+          </button>
         )}
       </div>
 
@@ -614,6 +649,48 @@ export default function BarDetailPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Management Modal */}
+      {showPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-primary">Manage Photos</h3>
+              <button
+                onClick={() => setShowPhotoModal(false)}
+                className="text-primary/40 hover:text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <ImageUpload
+              images={barPhotos}
+              onChange={setBarPhotos}
+              max={20}
+            />
+
+            <div className="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-light">
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="btn-outline"
+                disabled={savingPhotos}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSavePhotos}
+                className="btn-primary flex items-center gap-2"
+                disabled={savingPhotos}
+              >
+                {savingPhotos && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Photos
+              </button>
+            </div>
           </div>
         </div>
       )}
