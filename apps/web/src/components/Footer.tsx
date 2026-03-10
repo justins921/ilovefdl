@@ -124,7 +124,7 @@ export default function Footer() {
             {/* Social Links */}
             <div className="flex items-center gap-4 mt-6">
               <a
-                href="https://facebook.com/ilovefdl"
+                href="https://www.facebook.com/ilovefdl"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white/60 hover:text-accent transition-colors"
@@ -133,7 +133,7 @@ export default function Footer() {
                 <Facebook className="w-5 h-5" />
               </a>
               <a
-                href="https://instagram.com/ilovefdl"
+                href="https://www.instagram.com/ilovefdl"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white/60 hover:text-accent transition-colors"
@@ -142,11 +142,11 @@ export default function Footer() {
                 <Instagram className="w-5 h-5" />
               </a>
               <a
-                href="https://twitter.com/ilovefdl"
+                href="https://x.com/ilovefdl"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white/60 hover:text-accent transition-colors"
-                aria-label="Twitter"
+                aria-label="X (Twitter)"
               >
                 <Twitter className="w-5 h-5" />
               </a>

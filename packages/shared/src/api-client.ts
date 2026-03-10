@@ -12,6 +12,7 @@ import type {
   Product,
   Order,
   BlogPost,
+  BlogComment,
   Bar,
   Special,
   PushToken,
@@ -246,6 +247,11 @@ export class ApiClient {
     return this.get<ApiResponse<Vendor>>(`/vendors/${idOrSlug}`);
   }
 
+  /** Get the current user's vendor profile */
+  async getMyVendor(): Promise<ApiResponse<Vendor>> {
+    return this.get<ApiResponse<Vendor>>('/vendors/me');
+  }
+
   /** Create a new vendor profile */
   async createVendor(data: CreateVendorInput): Promise<ApiResponse<Vendor>> {
     return this.post<ApiResponse<Vendor>>('/vendors', data);
@@ -325,9 +331,22 @@ export class ApiClient {
     return this.get<PaginatedResponse<BlogPost>>('/posts', params as Record<string, string | number | boolean | undefined>);
   }
 
-  /** Get a single blog post by ID or slug */
-  async getPost(idOrSlug: string): Promise<ApiResponse<BlogPost>> {
-    return this.get<ApiResponse<BlogPost>>(`/posts/${idOrSlug}`);
+  /** Get a single blog post by ID or slug (includes prevPost/nextPost) */
+  async getPost(idOrSlug: string): Promise<ApiResponse<BlogPost & {
+    prevPost?: { slug: string; title: string; featuredImage: string | null } | null;
+    nextPost?: { slug: string; title: string; featuredImage: string | null } | null;
+  }>> {
+    return this.get(`/posts/${idOrSlug}`);
+  }
+
+  /** Get comments for a blog post */
+  async getPostComments(slug: string): Promise<ApiResponse<BlogComment[]>> {
+    return this.get(`/posts/${slug}/comments`);
+  }
+
+  /** Add a comment to a blog post */
+  async createPostComment(slug: string, data: { name: string; email?: string; body: string }): Promise<ApiResponse<BlogComment>> {
+    return this.post(`/posts/${slug}/comments`, data);
   }
 
   /** Create a new blog post */

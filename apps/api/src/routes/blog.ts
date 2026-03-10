@@ -113,10 +113,110 @@ router.get('/:slug', async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ data: post });
+    // Fetch prev/next posts
+    const [prevPost, nextPost] = await Promise.all([
+      prisma.blogPost.findFirst({
+        where: {
+          status: 'PUBLISHED',
+          publishedAt: post.publishedAt ? { lt: post.publishedAt } : undefined,
+          id: post.publishedAt ? undefined : { lt: post.id },
+        },
+        select: { slug: true, title: true, featuredImage: true },
+        orderBy: post.publishedAt ? { publishedAt: 'desc' } : { createdAt: 'desc' },
+      }),
+      prisma.blogPost.findFirst({
+        where: {
+          status: 'PUBLISHED',
+          publishedAt: post.publishedAt ? { gt: post.publishedAt } : undefined,
+          id: post.publishedAt ? undefined : { gt: post.id },
+        },
+        select: { slug: true, title: true, featuredImage: true },
+        orderBy: post.publishedAt ? { publishedAt: 'asc' } : { createdAt: 'asc' },
+      }),
+    ]);
+
+    res.json({ data: { ...post, prevPost, nextPost } });
   } catch (error) {
     console.error('Get post error:', error);
     res.status(500).json({ error: 'Failed to fetch post' });
+  }
+});
+
+/**
+ * GET /posts/:slug/comments
+ * Get comments for a blog post
+ */
+router.get('/:slug/comments', async (req: Request, res: Response) => {
+  try {
+    const post = await prisma.blogPost.findUnique({
+      where: { slug: req.params.slug },
+      select: { id: true },
+    });
+
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+
+    const comments = await prisma.blogComment.findMany({
+      where: { postId: post.id, isApproved: true },
+      include: {
+        user: { select: { id: true, name: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ data: comments });
+  } catch (error) {
+    console.error('Get comments error:', error);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+/**
+ * POST /posts/:slug/comments
+ * Add a comment to a blog post
+ */
+router.post('/:slug/comments', async (req: Request, res: Response) => {
+  try {
+    const post = await prisma.blogPost.findUnique({
+      where: { slug: req.params.slug },
+      select: { id: true },
+    });
+
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+
+    const { name, email, body } = req.body;
+    if (!name || !body) {
+      res.status(400).json({ error: 'Name and comment are required' });
+      return;
+    }
+
+    if (body.length > 5000) {
+      res.status(400).json({ error: 'Comment is too long (max 5000 characters)' });
+      return;
+    }
+
+    const comment = await prisma.blogComment.create({
+      data: {
+        postId: post.id,
+        userId: req.user?.id ?? null,
+        name: String(name).slice(0, 100),
+        email: email ? String(email).slice(0, 255) : null,
+        body: String(body).slice(0, 5000),
+      },
+      include: {
+        user: { select: { id: true, name: true, avatarUrl: true } },
+      },
+    });
+
+    res.status(201).json({ data: comment });
+  } catch (error) {
+    console.error('Create comment error:', error);
+    res.status(500).json({ error: 'Failed to create comment' });
   }
 });
 

@@ -420,6 +420,21 @@ export interface BlogPost {
 
   // Relations (optional, included when populated)
   author?: User;
+  comments?: BlogComment[];
+}
+
+export interface BlogComment {
+  id: string;
+  postId: string;
+  userId: string | null;
+  name: string;
+  email: string | null;
+  body: string;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  user?: User;
 }
 
 export interface Bar {

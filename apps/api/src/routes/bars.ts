@@ -15,24 +15,47 @@ function getTodayDayOfWeek(): DayOfWeek {
 
 /**
  * GET /bars
- * List active bars with today's specials
+ * List active bars with today's specials (paginated)
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
+    const { page = '1', limit = '20', search } = req.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
     const today = getTodayDayOfWeek();
 
-    const bars = await prisma.bar.findMany({
-      where: { isActive: true },
-      include: {
-        specials: {
-          where: { isActive: true, dayOfWeek: today },
-          select: { id: true },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
+    const where: Record<string, unknown> = { isActive: true };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
-    res.json({ data: bars });
+    const [bars, total] = await Promise.all([
+      prisma.bar.findMany({
+        where,
+        include: {
+          specials: {
+            where: { isActive: true, dayOfWeek: today },
+            select: { id: true },
+          },
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.bar.count({ where }),
+    ]);
+
+    res.json({
+      data: bars,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     console.error('List bars error:', error);
     res.status(500).json({ error: 'Failed to fetch bars' });

@@ -325,10 +325,15 @@ router.post('/checkout/multi', requireAuth, async (req: Request, res: Response) 
 
 /**
  * GET /orders
- * Get user's orders (auth) or all orders (admin)
+ * Get user's orders (auth) or all orders (admin), paginated
  */
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
+    const { page = '1', limit = '20', vendorId, status } = req.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
     let where: Record<string, unknown> = { userId: req.user!.id };
     if (req.user!.role === 'ADMIN') {
       where = {};
@@ -339,24 +344,42 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       }
     }
 
-    const orders = await prisma.order.findMany({
-      where,
-      include: {
-        items: {
-          include: {
-            product: {
-              select: { id: true, name: true, slug: true, images: true },
+    // Apply optional filters
+    if (vendorId) where.vendorId = vendorId;
+    if (status) where.status = status;
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: {
+            include: {
+              product: {
+                select: { id: true, name: true, slug: true, images: true },
+              },
             },
           },
+          vendor: {
+            select: { id: true, businessName: true, slug: true },
+          },
+          user: {
+            select: { id: true, name: true, email: true },
+          },
         },
-        vendor: {
-          select: { id: true, businessName: true, slug: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.order.count({ where }),
+    ]);
 
-    res.json({ data: orders });
+    res.json({
+      data: orders,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     console.error('List orders error:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });

@@ -16,6 +16,9 @@ import {
   Tag,
   Truck,
   MessageSquare,
+  Star,
+  Wallet,
+  Settings,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -36,25 +39,23 @@ export default function VendorDashboardPage() {
 
     async function fetchDashboardData() {
       try {
-        const vendorsRes = await api.getVendors({ limit: 100 });
-        const myVendor = vendorsRes.data.find((v) => v.userId === user!.id);
+        const vendorRes = await api.getMyVendor();
+        const myVendor = vendorRes.data;
 
-        if (myVendor) {
-          setVendor(myVendor);
+        setVendor(myVendor);
 
-          const [productsRes, ordersRes] = await Promise.all([
-            api.getProducts({ vendorId: myVendor.id, limit: 50 }),
-            api.getOrders({ vendorId: myVendor.id, limit: 10 }),
-          ]);
+        const [productsRes, ordersRes] = await Promise.all([
+          api.getProducts({ vendorId: myVendor.id, limit: 50 }),
+          api.getOrders({ vendorId: myVendor.id, limit: 10 }),
+        ]);
 
-          setProducts(productsRes.data);
-          setOrders(ordersRes.data);
-          setTotalRevenue(
-            ordersRes.data.reduce((sum, o) => sum + o.vendorNetAmount, 0)
-          );
-        }
+        setProducts(productsRes.data);
+        setOrders(ordersRes.data);
+        setTotalRevenue(
+          ordersRes.data.reduce((sum, o) => sum + o.vendorNetAmount, 0)
+        );
       } catch {
-        // Dashboard load failed
+        // Dashboard load failed — vendor profile not found
       } finally {
         setLoading(false);
       }
@@ -279,6 +280,18 @@ export default function VendorDashboardPage() {
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
                 </Link>
                 <Link
+                  href="/dashboard/orders"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShoppingCart className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Orders
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
                   href="/dashboard/coupons"
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
                 >
@@ -286,6 +299,42 @@ export default function VendorDashboardPage() {
                     <Tag className="w-5 h-5 text-teal" />
                     <span className="text-sm font-medium text-primary">
                       Coupons
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/reports"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Reports
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/reviews"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Star className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Reviews
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
+                </Link>
+                <Link
+                  href="/dashboard/withdraw"
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Wallet className="w-5 h-5 text-teal" />
+                    <span className="text-sm font-medium text-primary">
+                      Withdraw
                     </span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
@@ -303,13 +352,13 @@ export default function VendorDashboardPage() {
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
                 </Link>
                 <Link
-                  href="/dashboard/analytics"
+                  href="/dashboard/settings"
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
                 >
                   <div className="flex items-center gap-3">
-                    <BarChart3 className="w-5 h-5 text-teal" />
+                    <Settings className="w-5 h-5 text-teal" />
                     <span className="text-sm font-medium text-primary">
-                      Analytics
+                      Settings
                     </span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
