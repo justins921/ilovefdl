@@ -506,6 +506,7 @@ export default function SettingsPage() {
   }
 
   function renderPaymentTab() {
+    if (!vendor) return null;
     return (
       <div className="space-y-6">
         <p className="text-sm text-primary/60">
@@ -662,6 +663,7 @@ export default function SettingsPage() {
   }
 
   function renderSeoTab() {
+    if (!vendor) return null;
     return (
       <div className="space-y-6">
         <p className="text-sm text-primary/60">
