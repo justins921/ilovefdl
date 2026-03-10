@@ -394,7 +394,7 @@ export default function OrdersPage() {
                                     <p className="text-primary/80">
                                       {typeof order.shippingAddress === 'object'
                                         ? Object.values(
-                                            order.shippingAddress as Record<string, string>,
+                                            order.shippingAddress as unknown as Record<string, string>,
                                           )
                                             .filter(Boolean)
                                             .join(', ')
