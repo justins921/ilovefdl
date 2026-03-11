@@ -110,17 +110,13 @@ export default function OrdersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-white rounded w-1/3" />
-            <div className="h-10 bg-white rounded w-2/3" />
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-20 bg-white rounded-xl" />
-              ))}
-            </div>
-          </div>
+      <div className="animate-pulse space-y-8 py-6">
+        <div className="h-8 bg-white rounded w-1/3" />
+        <div className="h-10 bg-white rounded w-2/3" />
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-20 bg-white rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -130,7 +126,7 @@ export default function OrdersPage() {
 
   if (!vendor) {
     return (
-      <div className="min-h-screen bg-light flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center max-w-md">
           <Store className="w-16 h-16 text-primary/20 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary mb-3">
@@ -152,30 +148,26 @@ export default function OrdersPage() {
   // ─── Main Render ───────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-light">
+    <div>
       {/* Header */}
-      <div className="bg-white border-b border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
-                Orders
-              </h1>
-              <p className="text-primary/60 text-sm sm:text-base">
-                Manage orders for {vendor.businessName}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-primary/60">
-              <ShoppingCart className="w-4 h-4" />
-              <span>
-                {orders.length} total order{orders.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-primary mb-1">
+            Orders
+          </h1>
+          <p className="text-primary/60 text-sm">
+            Manage orders for {vendor.businessName}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-primary/60">
+          <ShoppingCart className="w-4 h-4" />
+          <span>
+            {orders.length} total order{orders.length !== 1 ? 's' : ''}
+          </span>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Error Banner */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">

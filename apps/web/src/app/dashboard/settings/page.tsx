@@ -301,25 +301,21 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-white rounded w-1/3" />
-            <div className="h-4 bg-white rounded w-1/4" />
-            <div className="flex gap-4 mt-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-10 bg-white rounded-lg w-32" />
-              ))}
+      <div className="animate-pulse space-y-8 py-6">
+        <div className="h-8 bg-white rounded w-1/3" />
+        <div className="h-4 bg-white rounded w-1/4" />
+        <div className="flex gap-4 mt-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-10 bg-white rounded-lg w-32" />
+          ))}
+        </div>
+        <div className="bg-white rounded-xl border border-light p-8 space-y-6">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-4 bg-light rounded w-24" />
+              <div className="h-10 bg-light rounded w-full" />
             </div>
-            <div className="bg-white rounded-xl border border-light p-8 space-y-6">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-4 bg-light rounded w-24" />
-                  <div className="h-10 bg-light rounded w-full" />
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     );
@@ -329,7 +325,7 @@ export default function SettingsPage() {
 
   if (!vendor) {
     return (
-      <div className="min-h-screen bg-light flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center max-w-md">
           <Store className="w-16 h-16 text-primary/20 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary mb-3">
@@ -770,26 +766,20 @@ export default function SettingsPage() {
   // ─── Main render ─────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-light">
+    <div>
       {/* Header */}
-      <div className="bg-white border-b border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
-                <Settings className="w-7 h-7 inline-block mr-2 -mt-1" />
-                Store Settings
-              </h1>
-              <p className="text-sm sm:text-base text-primary/60">
-                Manage your store details, payments, social profiles, and SEO for{' '}
-                {vendor.businessName}
-              </p>
-            </div>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-primary mb-1">
+            Settings
+          </h1>
+          <p className="text-sm text-primary/60">
+            Manage your store details, payments, social profiles, and SEO
+          </p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Error Banner */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">

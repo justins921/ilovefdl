@@ -73,25 +73,21 @@ export default function VendorDashboardPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-white rounded w-1/3" />
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-32 bg-white rounded-xl" />
-              ))}
-            </div>
-            <div className="h-64 bg-white rounded-xl" />
-          </div>
+      <div className="animate-pulse space-y-8 py-6">
+        <div className="h-8 bg-white rounded w-1/3" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-32 bg-white rounded-xl" />
+          ))}
         </div>
+        <div className="h-64 bg-white rounded-xl" />
       </div>
     );
   }
 
   if (!vendor) {
     return (
-      <div className="min-h-screen bg-light flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center max-w-md">
           <Store className="w-16 h-16 text-primary/20 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary mb-3">
@@ -111,31 +107,27 @@ export default function VendorDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-light">
+    <div>
       {/* Header */}
-      <div className="bg-white border-b border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-primary mb-1">
-                Vendor Dashboard
-              </h1>
-              <p className="text-primary/60">
-                Welcome back, {vendor.businessName}
-              </p>
-            </div>
-            <Link
-              href={`/vendors/${vendor.slug}`}
-              className="btn-outline text-sm"
-            >
-              <Store className="w-4 h-4 mr-2" />
-              View Storefront
-            </Link>
-          </div>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-primary mb-1">
+            Dashboard
+          </h1>
+          <p className="text-primary/60 text-sm">
+            Welcome back, {vendor.businessName}
+          </p>
         </div>
+        <Link
+          href={`/vendors/${vendor.slug}`}
+          className="btn-outline text-sm"
+        >
+          <Store className="w-4 h-4 mr-2" />
+          View Storefront
+        </Link>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <div className="bg-white rounded-xl border border-light p-6">
