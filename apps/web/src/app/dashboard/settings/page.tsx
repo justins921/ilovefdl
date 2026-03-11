@@ -17,6 +17,10 @@ import {
   Globe,
   Phone,
   MapPin,
+  Lightbulb,
+  Info,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -56,6 +60,26 @@ interface SeoForm {
   seoTitle: string;
   seoDescription: string;
   slug: string;
+}
+
+// ─── Helper: Tip box ─────────────────────────────────────
+
+function TipBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-teal/5 border border-teal/20 rounded-lg px-4 py-3 flex gap-3">
+      <Lightbulb className="w-4 h-4 text-teal flex-shrink-0 mt-0.5" />
+      <p className="text-xs text-primary/70 leading-relaxed">{children}</p>
+    </div>
+  );
+}
+
+function FieldHint({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs text-primary/40 mt-1 flex items-start gap-1">
+      <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+      <span>{children}</span>
+    </p>
+  );
 }
 
 // ─── Component ──────────────────────────────────────────
@@ -349,6 +373,11 @@ export default function SettingsPage() {
   function renderStoreTab() {
     return (
       <div className="space-y-6">
+        <TipBox>
+          A complete store profile builds trust with customers. Stores with a logo, description,
+          and contact info get up to 3x more views than incomplete profiles.
+        </TipBox>
+
         {/* Business Name */}
         <div>
           <label className="block text-sm font-medium text-primary mb-1.5">
@@ -364,33 +393,38 @@ export default function SettingsPage() {
               className="input-field pl-10"
             />
           </div>
-          {fieldErrors.businessName && (
+          {fieldErrors.businessName ? (
             <p className="text-xs text-red-500 mt-1">{fieldErrors.businessName}</p>
+          ) : (
+            <FieldHint>This appears on your storefront, in search results, and on receipts.</FieldHint>
           )}
         </div>
 
         {/* Description */}
         <div>
           <label className="block text-sm font-medium text-primary mb-1.5">
-            Description
+            Description <span className="text-primary/30 font-normal">(optional)</span>
           </label>
           <textarea
             value={storeForm.description}
             onChange={(e) => setStoreForm((prev) => ({ ...prev, description: e.target.value }))}
-            placeholder="Tell customers about your store..."
+            placeholder="Tell customers what makes your store unique — your story, what you sell, and why they should shop with you."
             rows={4}
             maxLength={2000}
             className="input-field resize-none"
           />
-          <p className="text-xs text-primary/40 mt-1 text-right">
-            {storeForm.description.length}/2000
-          </p>
+          <div className="flex justify-between mt-1">
+            <FieldHint>Write 2-3 sentences about your store. Focus on what makes you different.</FieldHint>
+            <span className="text-xs text-primary/40 flex-shrink-0 ml-2">
+              {storeForm.description.length}/2000
+            </span>
+          </div>
         </div>
 
         {/* Address */}
         <div>
           <label className="block text-sm font-medium text-primary mb-1.5">
-            Address
+            Address <span className="text-primary/30 font-normal">(optional)</span>
           </label>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
@@ -398,104 +432,111 @@ export default function SettingsPage() {
               type="text"
               value={storeForm.address}
               onChange={(e) => setStoreForm((prev) => ({ ...prev, address: e.target.value }))}
-              placeholder="123 Main St, City, State"
+              placeholder="123 Main St, Fond du Lac, WI 54935"
               className="input-field pl-10"
             />
           </div>
+          <FieldHint>Helps local customers find you. Only shown on your public storefront.</FieldHint>
         </div>
 
-        {/* Phone */}
-        <div>
-          <label className="block text-sm font-medium text-primary mb-1.5">
-            Phone
-          </label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
-            <input
-              type="tel"
-              value={storeForm.phone}
-              onChange={(e) => setStoreForm((prev) => ({ ...prev, phone: e.target.value }))}
-              placeholder="(555) 123-4567"
-              className="input-field pl-10"
-            />
+        {/* Phone & Website row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-primary mb-1.5">
+              Phone <span className="text-primary/30 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+              <input
+                type="tel"
+                value={storeForm.phone}
+                onChange={(e) => setStoreForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="(920) 555-0123"
+                className="input-field pl-10"
+              />
+            </div>
+            {fieldErrors.phone && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors.phone}</p>
+            )}
           </div>
-          {fieldErrors.phone && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors.phone}</p>
-          )}
+
+          <div>
+            <label className="block text-sm font-medium text-primary mb-1.5">
+              Website <span className="text-primary/30 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+              <input
+                type="url"
+                value={storeForm.website}
+                onChange={(e) => setStoreForm((prev) => ({ ...prev, website: e.target.value }))}
+                placeholder="https://yourwebsite.com"
+                className="input-field pl-10"
+              />
+            </div>
+            {fieldErrors.website && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors.website}</p>
+            )}
+          </div>
         </div>
 
-        {/* Website */}
-        <div>
-          <label className="block text-sm font-medium text-primary mb-1.5">
-            Website
-          </label>
-          <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+        {/* Logo & Banner row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-primary mb-1.5">
+              Logo URL <span className="text-primary/30 font-normal">(optional)</span>
+            </label>
             <input
               type="url"
-              value={storeForm.website}
-              onChange={(e) => setStoreForm((prev) => ({ ...prev, website: e.target.value }))}
-              placeholder="https://yourwebsite.com"
-              className="input-field pl-10"
+              value={storeForm.logoUrl}
+              onChange={(e) => setStoreForm((prev) => ({ ...prev, logoUrl: e.target.value }))}
+              placeholder="https://example.com/logo.png"
+              className="input-field"
             />
+            {fieldErrors.logoUrl ? (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors.logoUrl}</p>
+            ) : (
+              <FieldHint>Square image works best (at least 200x200px).</FieldHint>
+            )}
+            {storeForm.logoUrl && !fieldErrors.logoUrl && (
+              <div className="mt-2">
+                <img
+                  src={storeForm.logoUrl}
+                  alt="Logo preview"
+                  className="w-16 h-16 rounded-lg object-cover border border-light"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
           </div>
-          {fieldErrors.website && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors.website}</p>
-          )}
-        </div>
 
-        {/* Logo URL */}
-        <div>
-          <label className="block text-sm font-medium text-primary mb-1.5">
-            Logo URL
-          </label>
-          <input
-            type="url"
-            value={storeForm.logoUrl}
-            onChange={(e) => setStoreForm((prev) => ({ ...prev, logoUrl: e.target.value }))}
-            placeholder="https://example.com/logo.png"
-            className="input-field"
-          />
-          {fieldErrors.logoUrl && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors.logoUrl}</p>
-          )}
-          {storeForm.logoUrl && !fieldErrors.logoUrl && (
-            <div className="mt-2">
-              <img
-                src={storeForm.logoUrl}
-                alt="Logo preview"
-                className="w-16 h-16 rounded-lg object-cover border border-light"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Banner URL */}
-        <div>
-          <label className="block text-sm font-medium text-primary mb-1.5">
-            Banner URL
-          </label>
-          <input
-            type="url"
-            value={storeForm.bannerUrl}
-            onChange={(e) => setStoreForm((prev) => ({ ...prev, bannerUrl: e.target.value }))}
-            placeholder="https://example.com/banner.jpg"
-            className="input-field"
-          />
-          {fieldErrors.bannerUrl && (
-            <p className="text-xs text-red-500 mt-1">{fieldErrors.bannerUrl}</p>
-          )}
-          {storeForm.bannerUrl && !fieldErrors.bannerUrl && (
-            <div className="mt-2">
-              <img
-                src={storeForm.bannerUrl}
-                alt="Banner preview"
-                className="w-full h-32 rounded-lg object-cover border border-light"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-primary mb-1.5">
+              Banner URL <span className="text-primary/30 font-normal">(optional)</span>
+            </label>
+            <input
+              type="url"
+              value={storeForm.bannerUrl}
+              onChange={(e) => setStoreForm((prev) => ({ ...prev, bannerUrl: e.target.value }))}
+              placeholder="https://example.com/banner.jpg"
+              className="input-field"
+            />
+            {fieldErrors.bannerUrl ? (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors.bannerUrl}</p>
+            ) : (
+              <FieldHint>Wide image recommended (1200x400px or similar).</FieldHint>
+            )}
+            {storeForm.bannerUrl && !fieldErrors.bannerUrl && (
+              <div className="mt-2">
+                <img
+                  src={storeForm.bannerUrl}
+                  alt="Banner preview"
+                  className="w-full h-20 rounded-lg object-cover border border-light"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -510,16 +551,24 @@ export default function SettingsPage() {
         </p>
 
         {/* Stripe Connection Status */}
-        <div className="bg-light rounded-xl p-6 border border-light">
+        <div className={`rounded-xl p-6 border ${
+          vendor.stripeOnboarded
+            ? 'bg-green-50/50 border-green-200'
+            : 'bg-yellow-50/50 border-yellow-200'
+        }`}>
           <div className="flex items-start gap-4">
             <div
               className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                 vendor.stripeOnboarded
                   ? 'bg-green-100 text-green-600'
-                  : 'bg-yellow-50 text-yellow-600'
+                  : 'bg-yellow-100 text-yellow-600'
               }`}
             >
-              <CreditCard className="w-6 h-6" />
+              {vendor.stripeOnboarded ? (
+                <CheckCircle2 className="w-6 h-6" />
+              ) : (
+                <AlertCircle className="w-6 h-6" />
+              )}
             </div>
             <div className="flex-1">
               <h3 className="text-base font-bold text-primary mb-1">
@@ -528,7 +577,7 @@ export default function SettingsPage() {
               {vendor.stripeOnboarded ? (
                 <>
                   <p className="text-sm text-green-600 font-medium mb-2">
-                    Connected
+                    Connected &amp; Ready
                   </p>
                   <p className="text-sm text-primary/60">
                     Your Stripe account is connected and ready to receive payouts.
@@ -538,16 +587,16 @@ export default function SettingsPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm text-yellow-600 font-medium mb-2">
-                    Not Connected
+                  <p className="text-sm text-yellow-700 font-medium mb-2">
+                    Not Connected Yet
                   </p>
                   <p className="text-sm text-primary/60 mb-4">
                     Connect your Stripe account to start receiving payouts from your
-                    sales. You&apos;ll need to complete Stripe&apos;s onboarding process to
-                    verify your identity and set up your bank account.
+                    sales. This takes about 5 minutes &mdash; you&apos;ll verify your
+                    identity and set up your bank account.
                   </p>
                   <button className="btn-primary">
-                    Connect Stripe
+                    Connect Stripe Account
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </button>
                 </>
@@ -568,6 +617,9 @@ export default function SettingsPage() {
               </p>
               <p className="font-medium text-primary">
                 {(vendor.commissionRate * 100).toFixed(0)}%
+              </p>
+              <p className="text-xs text-primary/40 mt-0.5">
+                This is deducted from each sale
               </p>
             </div>
             <div>
@@ -625,55 +677,71 @@ export default function SettingsPage() {
 
     return (
       <div className="space-y-6">
-        <p className="text-sm text-primary/60">
-          Add your social media profiles so customers can find and follow your store.
-        </p>
+        <TipBox>
+          Linking your social profiles helps customers connect with your brand across platforms.
+          Vendors with linked social accounts see higher engagement and repeat purchases.
+        </TipBox>
 
-        {platforms.map((platform) => {
-          const Icon = platform.icon;
-          return (
-            <div key={platform.key}>
-              <label className="block text-sm font-medium text-primary mb-1.5">
-                {platform.label}
-              </label>
-              <div className="relative">
-                <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
-                <input
-                  type="url"
-                  value={socialForm[platform.key]}
-                  onChange={(e) =>
-                    setSocialForm((prev) => ({ ...prev, [platform.key]: e.target.value }))
-                  }
-                  placeholder={platform.placeholder}
-                  className="input-field pl-10"
-                />
+        <div className="space-y-5">
+          {platforms.map((platform) => {
+            const Icon = platform.icon;
+            const value = socialForm[platform.key];
+            const hasValue = value.trim().length > 0;
+            return (
+              <div key={platform.key}>
+                <label className="block text-sm font-medium text-primary mb-1.5">
+                  {platform.label}{' '}
+                  <span className="text-primary/30 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <Icon className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                    hasValue ? 'text-teal' : 'text-primary/30'
+                  }`} />
+                  <input
+                    type="url"
+                    value={value}
+                    onChange={(e) =>
+                      setSocialForm((prev) => ({ ...prev, [platform.key]: e.target.value }))
+                    }
+                    placeholder={platform.placeholder}
+                    className="input-field pl-10"
+                  />
+                </div>
+                {fieldErrors[platform.key] && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors[platform.key]}</p>
+                )}
               </div>
-              {fieldErrors[platform.key] && (
-                <p className="text-xs text-red-500 mt-1">{fieldErrors[platform.key]}</p>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   }
 
   function renderSeoTab() {
     if (!vendor) return null;
+
+    const seoTitleLength = seoForm.seoTitle.length;
+    const seoDescLength = seoForm.seoDescription.length;
+    const titleColor = seoTitleLength === 0 ? 'text-primary/40' : seoTitleLength <= 60 ? 'text-green-600' : seoTitleLength <= 70 ? 'text-yellow-600' : 'text-red-500';
+    const descColor = seoDescLength === 0 ? 'text-primary/40' : seoDescLength <= 150 ? 'text-green-600' : seoDescLength <= 160 ? 'text-yellow-600' : 'text-red-500';
+
     return (
       <div className="space-y-6">
-        <p className="text-sm text-primary/60">
-          Optimize how your store appears in search engine results. These fields help improve
-          your store&apos;s visibility on Google and other search engines.
-        </p>
+        <TipBox>
+          Good SEO helps local customers find your store on Google. Use keywords that describe what
+          you sell and include &quot;Fond du Lac&quot; or &quot;FDL&quot; to rank for local searches.
+        </TipBox>
 
         {/* Slug */}
         <div>
           <label className="block text-sm font-medium text-primary mb-1.5">
-            Store Slug <span className="text-accent">*</span>
+            Store URL Slug <span className="text-accent">*</span>
           </label>
-          <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+          <div className="flex items-center gap-0 rounded-lg border border-light overflow-hidden focus-within:ring-2 focus-within:ring-accent/30">
+            <span className="bg-light px-3 py-2.5 text-sm text-primary/50 border-r border-light whitespace-nowrap">
+              ilovefdl.com/vendors/
+            </span>
             <input
               type="text"
               value={seoForm.slug}
@@ -684,36 +752,37 @@ export default function SettingsPage() {
                 }))
               }
               placeholder="my-store"
-              className="input-field pl-10"
+              className="flex-1 px-3 py-2.5 text-sm bg-white outline-none"
             />
           </div>
-          <p className="text-xs text-primary/40 mt-1">
-            Your store URL: /vendors/{seoForm.slug || 'my-store'}
-          </p>
-          {fieldErrors.slug && (
+          {fieldErrors.slug ? (
             <p className="text-xs text-red-500 mt-1">{fieldErrors.slug}</p>
+          ) : (
+            <FieldHint>Use your business name with hyphens. Keep it short and memorable.</FieldHint>
           )}
         </div>
 
         {/* SEO Title */}
         <div>
           <label className="block text-sm font-medium text-primary mb-1.5">
-            SEO Title
+            SEO Title <span className="text-primary/30 font-normal">(optional)</span>
           </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
-            <input
-              type="text"
-              value={seoForm.seoTitle}
-              onChange={(e) => setSeoForm((prev) => ({ ...prev, seoTitle: e.target.value }))}
-              placeholder="Store name - tagline or keywords"
-              maxLength={70}
-              className="input-field pl-10"
-            />
+          <input
+            type="text"
+            value={seoForm.seoTitle}
+            onChange={(e) => setSeoForm((prev) => ({ ...prev, seoTitle: e.target.value }))}
+            placeholder={`${vendor.businessName} - Local Shop in Fond du Lac, WI`}
+            maxLength={70}
+            className="input-field"
+          />
+          <div className="flex justify-between mt-1">
+            <FieldHint>
+              Include your business name and what you sell. Aim for 50-60 characters.
+            </FieldHint>
+            <span className={`text-xs flex-shrink-0 ml-2 ${titleColor}`}>
+              {seoTitleLength}/70
+            </span>
           </div>
-          <p className="text-xs text-primary/40 mt-1 text-right">
-            {seoForm.seoTitle.length}/70
-          </p>
           {fieldErrors.seoTitle && (
             <p className="text-xs text-red-500 mt-1">{fieldErrors.seoTitle}</p>
           )}
@@ -722,19 +791,24 @@ export default function SettingsPage() {
         {/* SEO Description */}
         <div>
           <label className="block text-sm font-medium text-primary mb-1.5">
-            Meta Description
+            Meta Description <span className="text-primary/30 font-normal">(optional)</span>
           </label>
           <textarea
             value={seoForm.seoDescription}
             onChange={(e) => setSeoForm((prev) => ({ ...prev, seoDescription: e.target.value }))}
-            placeholder="A brief description of your store for search results..."
+            placeholder="Shop handmade goods and local products from [Your Store]. Proudly serving the Fond du Lac community. Free local pickup available."
             rows={3}
             maxLength={160}
             className="input-field resize-none"
           />
-          <p className="text-xs text-primary/40 mt-1 text-right">
-            {seoForm.seoDescription.length}/160
-          </p>
+          <div className="flex justify-between mt-1">
+            <FieldHint>
+              Write a compelling 1-2 sentence description. Include a benefit or call-to-action.
+            </FieldHint>
+            <span className={`text-xs flex-shrink-0 ml-2 ${descColor}`}>
+              {seoDescLength}/160
+            </span>
+          </div>
           {fieldErrors.seoDescription && (
             <p className="text-xs text-red-500 mt-1">{fieldErrors.seoDescription}</p>
           )}
@@ -742,11 +816,17 @@ export default function SettingsPage() {
 
         {/* Search Preview */}
         <div>
-          <label className="block text-sm font-medium text-primary mb-3">
-            Search Preview
+          <label className="block text-sm font-medium text-primary mb-2">
+            Google Search Preview
           </label>
-          <div className="bg-light rounded-lg p-4 border border-light">
-            <p className="text-lg text-blue-700 truncate">
+          <div className="bg-white rounded-lg p-5 border border-light shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-accent">F</span>
+              </div>
+              <span className="text-xs text-primary/50">ilovefdl.com</span>
+            </div>
+            <p className="text-lg text-blue-700 hover:underline cursor-pointer truncate leading-snug">
               {seoForm.seoTitle || vendor.businessName || 'Your Store Name'}
             </p>
             <p className="text-sm text-green-700 truncate mt-0.5">
@@ -758,6 +838,9 @@ export default function SettingsPage() {
                 'Add an SEO description to control how your store appears in search results.'}
             </p>
           </div>
+          <p className="text-xs text-primary/40 mt-2 text-center">
+            This is an approximation of how your store may appear in Google results.
+          </p>
         </div>
       </div>
     );
