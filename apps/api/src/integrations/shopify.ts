@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { ExternalPlatform, type ExternalProduct } from '@ilovefdl/shared';
 import type { PlatformAdapter } from './types';
 
@@ -6,24 +7,38 @@ const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET || '';
 const SHOPIFY_SCOPES = 'read_products,write_inventory';
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
+/**
+ * Validate and sanitize a Shopify domain to prevent SSRF.
+ * Only allows alphanumeric characters and hyphens (valid Shopify subdomains).
+ */
+function sanitizeShopDomain(shopDomain: string): string {
+  const domain = shopDomain.replace(/\.myshopify\.com$/, '');
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/.test(domain) && !/^[a-zA-Z0-9]$/.test(domain)) {
+    throw new Error('Invalid Shopify domain format');
+  }
+  return domain;
+}
+
 export class ShopifyAdapter implements PlatformAdapter {
   readonly name = 'Shopify';
 
   getAuthUrl(shopDomain?: string): string {
     if (!shopDomain) throw new Error('shopDomain is required for Shopify');
-    const domain = shopDomain.replace(/\.myshopify\.com$/, '');
+    const domain = sanitizeShopDomain(shopDomain);
     const redirectUri = `${APP_URL}/api/integrations/shopify/callback`;
+    const state = crypto.randomBytes(16).toString('hex');
     return (
       `https://${domain}.myshopify.com/admin/oauth/authorize` +
       `?client_id=${SHOPIFY_API_KEY}` +
       `&scope=${SHOPIFY_SCOPES}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}`
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&state=${state}`
     );
   }
 
   async exchangeCode(code: string, shopDomain?: string) {
     if (!shopDomain) throw new Error('shopDomain is required for Shopify');
-    const domain = shopDomain.replace(/\.myshopify\.com$/, '');
+    const domain = sanitizeShopDomain(shopDomain);
     const fullDomain = `${domain}.myshopify.com`;
 
     const res = await fetch(

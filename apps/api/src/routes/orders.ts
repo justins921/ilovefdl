@@ -266,48 +266,54 @@ router.post('/checkout/multi', requireAuth, async (req: Request, res: Response) 
       },
     });
 
-    // Create one Order record per vendor
-    const orderIds: string[] = [];
-    let isFirst = true;
+    // Create one Order record per vendor atomically
+    const orders = await prisma.$transaction(async (tx) => {
+      const createdOrders = [];
+      let isFirst = true;
 
-    for (const vendor of vendors) {
-      const vendorItems = vendorGroups.get(vendor.id)!;
-      const commission = vendorCommissions.get(vendor.id)!;
+      for (const vendor of vendors) {
+        const vendorItems = vendorGroups.get(vendor.id)!;
+        const commission = vendorCommissions.get(vendor.id)!;
 
-      const order = await prisma.order.create({
-        data: {
-          userId: req.user!.id,
-          vendorId: vendor.id,
-          status: 'PENDING',
-          subtotal: commission.commissionBaseAmount,
-          total: commission.commissionBaseAmount,
-          commissionBaseAmount: commission.commissionBaseAmount,
-          commissionRate: vendor.commissionRate,
-          commissionAmount: commission.commissionAmount,
-          vendorNetAmount: commission.vendorNetAmount,
-          orderGroupId,
-          // Only the FIRST order gets the stripeSessionId (unique constraint)
-          stripeSessionId: isFirst ? session.id : null,
-          shippingAddress: shippingAddress || undefined,
-          notes,
-          items: {
-            create: vendorItems.map((item) => {
-              const product = products.find((p) => p.id === item.productId)!;
-              return {
-                productId: product.id,
-                quantity: item.quantity,
-                unitPrice: product.price,
-                total: product.price * item.quantity,
-              };
-            }),
+        const order = await tx.order.create({
+          data: {
+            userId: req.user!.id,
+            vendorId: vendor.id,
+            status: 'PENDING',
+            subtotal: commission.commissionBaseAmount,
+            total: commission.commissionBaseAmount,
+            commissionBaseAmount: commission.commissionBaseAmount,
+            commissionRate: vendor.commissionRate,
+            commissionAmount: commission.commissionAmount,
+            vendorNetAmount: commission.vendorNetAmount,
+            orderGroupId,
+            // Only the FIRST order gets the stripeSessionId (unique constraint)
+            stripeSessionId: isFirst ? session.id : null,
+            shippingAddress: shippingAddress || undefined,
+            notes,
+            items: {
+              create: vendorItems.map((item) => {
+                const product = products.find((p) => p.id === item.productId)!;
+                return {
+                  productId: product.id,
+                  quantity: item.quantity,
+                  unitPrice: product.price,
+                  total: product.price * item.quantity,
+                };
+              }),
+            },
           },
-        },
-        include: { items: true },
-      });
+          include: { items: true },
+        });
 
-      orderIds.push(order.id);
-      isFirst = false;
-    }
+        createdOrders.push(order);
+        isFirst = false;
+      }
+
+      return createdOrders;
+    });
+
+    const orderIds = orders.map((o) => o.id);
 
     res.json({
       data: {

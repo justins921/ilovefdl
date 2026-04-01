@@ -95,8 +95,8 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
  */
 router.get('/:slug', async (req: Request, res: Response) => {
   try {
-    const vendor = await prisma.vendor.findUnique({
-      where: { slug: req.params.slug },
+    const vendor = await prisma.vendor.findFirst({
+      where: { slug: req.params.slug, status: 'APPROVED' },
       select: {
         id: true,
         businessName: true,

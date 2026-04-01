@@ -161,8 +161,11 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         return;
       }
       resolvedVendorId = bodyVendorId;
-    } else if (vendor) {
+    } else if (vendor && vendor.status === 'APPROVED') {
       resolvedVendorId = vendor.id;
+    } else if (vendor) {
+      res.status(403).json({ error: 'Your vendor account must be approved to create products' });
+      return;
     } else {
       res.status(403).json({ error: 'You must be a vendor to create products' });
       return;

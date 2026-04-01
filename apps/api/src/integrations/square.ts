@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { ExternalPlatform, type ExternalProduct } from '@ilovefdl/shared';
 import type { PlatformAdapter } from './types';
 
@@ -21,11 +22,13 @@ export class SquareAdapter implements PlatformAdapter {
 
   getAuthUrl(): string {
     const redirectUri = `${APP_URL}/api/integrations/square/callback`;
+    const state = crypto.randomBytes(16).toString('hex');
     return (
       `${OAUTH_BASE}/oauth2/authorize` +
       `?client_id=${SQUARE_APP_ID}` +
       `&scope=ITEMS_READ+ITEMS_WRITE+INVENTORY_READ+INVENTORY_WRITE` +
       `&session=false` +
+      `&state=${state}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}`
     );
   }

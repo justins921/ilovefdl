@@ -25,7 +25,8 @@ router.post('/register', async (req: Request, res: Response) => {
     // Check if user already exists
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      res.status(409).json({ error: 'An account with this email already exists' });
+      // Return generic message to prevent user enumeration
+      res.status(409).json({ error: 'Unable to create account with this email' });
       return;
     }
 
@@ -326,14 +327,15 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       data: { usedAt: new Date() },
     });
 
-    // Generate a secure random token
+    // Generate a secure random token and store its hash
     const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     // Create a new password reset token (expires in 1 hour)
     await prisma.passwordResetToken.create({
       data: {
         userId: user.id,
-        token,
+        token: tokenHash,
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
@@ -362,9 +364,10 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 
     const { token, password } = parsed.data;
 
-    // Look up the token
+    // Hash the provided token and look it up
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: tokenHash },
     });
 
     if (!resetToken) {
