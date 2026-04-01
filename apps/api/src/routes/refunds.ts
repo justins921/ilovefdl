@@ -40,8 +40,14 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     if (!['PAID', 'FULFILLED'].includes(order.status)) {
       res.status(400).json({ error: 'Order is not eligible for refund' }); return;
     }
-    if (parsed.data.amount > order.total) {
-      res.status(400).json({ error: 'Refund amount exceeds order total' }); return;
+    // Check cumulative refunds don't exceed order total
+    const existingRefunds = await prisma.refund.aggregate({
+      where: { orderId: parsed.data.orderId, status: { not: 'REJECTED' } },
+      _sum: { amount: true },
+    });
+    const totalRefunded = existingRefunds._sum.amount ?? 0;
+    if (parsed.data.amount + totalRefunded > order.total) {
+      res.status(400).json({ error: 'Total refund amount would exceed order total' }); return;
     }
 
     const refund = await prisma.refund.create({

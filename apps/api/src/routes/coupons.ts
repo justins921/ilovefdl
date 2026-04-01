@@ -87,7 +87,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /coupons/validate — validate a coupon code at checkout
-router.post('/validate', async (req: Request, res: Response) => {
+router.post('/validate', requireAuth, async (req: Request, res: Response) => {
   try {
     const parsed = validateCouponSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }

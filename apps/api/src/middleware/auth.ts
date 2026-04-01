@@ -44,7 +44,7 @@ export async function authMiddleware(
     }
 
     const token = authHeader.slice(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as JwtPayload;
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },

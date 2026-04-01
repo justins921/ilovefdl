@@ -67,35 +67,32 @@ router.post('/redeem', requireAuth, async (req: Request, res: Response) => {
 
     const { points } = parsed.data;
 
+    // Atomically check and deduct points using a raw query to prevent race conditions
+    const updatedAccounts = await prisma.$executeRaw`
+      UPDATE "LoyaltyAccount"
+      SET points = points - ${points}
+      WHERE "userId" = ${req.user!.id} AND points >= ${points}
+    `;
+
+    if (updatedAccounts === 0) {
+      res.status(400).json({ error: 'Insufficient points or account not found' });
+      return;
+    }
+
     const account = await prisma.loyaltyAccount.findUnique({
       where: { userId: req.user!.id },
     });
 
-    if (!account) {
-      res.status(404).json({ error: 'Loyalty account not found' });
-      return;
-    }
+    await prisma.loyaltyTransaction.create({
+      data: {
+        accountId: account!.id,
+        points: -points,
+        type: 'redeem',
+        description: `Redeemed ${points} points for $${(points / 100).toFixed(2)} discount`,
+      },
+    });
 
-    if (account.points < points) {
-      res.status(400).json({ error: 'Insufficient points' });
-      return;
-    }
-
-    // Deduct points and create transaction
-    const [updatedAccount] = await prisma.$transaction([
-      prisma.loyaltyAccount.update({
-        where: { id: account.id },
-        data: { points: { decrement: points } },
-      }),
-      prisma.loyaltyTransaction.create({
-        data: {
-          accountId: account.id,
-          points: -points,
-          type: 'redeem',
-          description: `Redeemed ${points} points for $${(points / 100).toFixed(2)} discount`,
-        },
-      }),
-    ]);
+    const updatedAccount = account!;
 
     res.json({
       data: {

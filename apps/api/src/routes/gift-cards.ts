@@ -61,8 +61,8 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-// GET /gift-cards/balance/:code — check gift card balance (public)
-router.get('/balance/:code', async (req: Request, res: Response) => {
+// GET /gift-cards/balance/:code — check gift card balance (requires auth)
+router.get('/balance/:code', requireAuth, async (req: Request, res: Response) => {
   try {
     const giftCard = await prisma.giftCard.findUnique({
       where: { code: req.params.code },
@@ -97,7 +97,27 @@ router.post('/redeem', requireAuth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Gift card has no remaining balance' }); return;
     }
 
-    res.json({ data: { discount: giftCard.currentBalance, remainingBalance: 0 } });
+    const discount = giftCard.currentBalance;
+
+    // Atomically deduct balance and record transaction
+    const [updatedCard] = await prisma.$transaction([
+      prisma.giftCard.update({
+        where: { id: giftCard.id },
+        data: {
+          currentBalance: 0,
+          status: 'REDEEMED',
+        },
+      }),
+      prisma.giftCardTransaction.create({
+        data: {
+          giftCardId: giftCard.id,
+          type: 'redemption',
+          amount: -discount,
+        },
+      }),
+    ]);
+
+    res.json({ data: { discount, remainingBalance: updatedCard.currentBalance } });
   } catch (error) {
     console.error('Redeem gift card error:', error);
     res.status(500).json({ error: 'Failed to redeem gift card' });
