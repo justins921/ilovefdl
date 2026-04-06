@@ -14,6 +14,8 @@ datasource db {
 enum Role {
   ADMIN
   VENDOR
+  BAR_OWNER
+  CONTRACTOR
   EDITOR
   USER
 }
@@ -119,6 +121,7 @@ model User {
   receivedMessages       Message[]           @relation("RecipientMessages")
   conversations          ConversationParticipant[]
   abandonedCarts         AbandonedCart[]
+  blogComments           BlogComment[]
   giftCardsPurchased     GiftCard[]          @relation("GiftCardPurchaser")
   paymentMethods         PaymentMethod[]
   loyaltyAccount         LoyaltyAccount?
@@ -541,9 +544,28 @@ model BlogPost {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
+  comments    BlogComment[]
+
   @@index([category])
   @@index([status])
   @@map("blog_posts")
+}
+
+model BlogComment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String
+  email     String?
+  body      String
+  isApproved Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
+  @@map("blog_comments")
 }
 
 // ─── BAR DIRECTORY ───────────────────────────────────────
@@ -554,6 +576,8 @@ model Bar {
   slug        String   @unique
   description String?
   address     String
+  latitude    Float?
+  longitude   Float?
   mapLink     String?
   phone       String?
   website     String?

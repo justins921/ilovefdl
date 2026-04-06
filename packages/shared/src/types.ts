@@ -3,6 +3,8 @@
 export enum Role {
   ADMIN = 'ADMIN',
   VENDOR = 'VENDOR',
+  BAR_OWNER = 'BAR_OWNER',
+  CONTRACTOR = 'CONTRACTOR',
   EDITOR = 'EDITOR',
   USER = 'USER',
 }
@@ -418,6 +420,21 @@ export interface BlogPost {
 
   // Relations (optional, included when populated)
   author?: User;
+  comments?: BlogComment[];
+}
+
+export interface BlogComment {
+  id: string;
+  postId: string;
+  userId: string | null;
+  name: string;
+  email: string | null;
+  body: string;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  user?: User;
 }
 
 export interface Bar {
@@ -426,6 +443,8 @@ export interface Bar {
   slug: string;
   description: string | null;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
   mapLink: string | null;
   phone: string | null;
   website: string | null;

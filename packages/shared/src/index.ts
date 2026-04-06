@@ -37,6 +37,7 @@ export type {
   ConversationParticipant,
   Message,
   BlogPost,
+  BlogComment,
   Bar,
   Special,
   PushToken,

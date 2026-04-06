@@ -33,6 +33,7 @@ import subscriptionRoutes from './routes/subscriptions';
 import campaignRoutes from './routes/campaigns';
 import currencyRoutes from './routes/currency';
 import shippingRateRoutes from './routes/shipping-rates';
+import uploadRoutes from './routes/uploads';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -119,6 +120,7 @@ app.use('/subscriptions', subscriptionRoutes);
 app.use('/campaigns', campaignRoutes);
 app.use('/currency', currencyRoutes);
 app.use('/shipping', shippingRateRoutes);
+app.use('/uploads', uploadRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, User as UserIcon, ArrowRight, Heart, Loader2 } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight, Heart, Loader2, Store } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -195,7 +195,17 @@ export default function AuthPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-primary/40 mt-6">
+        <div className="mt-6 text-center">
+          <Link
+            href="/auth/vendor"
+            className="inline-flex items-center gap-2 text-sm text-teal hover:text-teal/80 font-medium transition-colors"
+          >
+            <Store className="w-4 h-4" />
+            Want to sell on I Love FDL? Register as a vendor
+          </Link>
+        </div>
+
+        <p className="text-center text-xs text-primary/40 mt-4">
           By signing in, you agree to our Terms of Service and Privacy Policy.
         </p>
       </div>
