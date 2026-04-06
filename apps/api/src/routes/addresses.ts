@@ -15,7 +15,8 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     res.json({ data: addresses });
   } catch (error) {
     console.error('List addresses error:', error);
-    res.status(500).json({ error: 'Failed to fetch addresses' });
+    const message = error instanceof Error ? error.message : 'Failed to fetch addresses';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -39,7 +40,8 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     res.status(201).json({ data: address });
   } catch (error) {
     console.error('Create address error:', error);
-    res.status(500).json({ error: 'Failed to create address' });
+    const message = error instanceof Error ? error.message : 'Failed to create address';
+    res.status(500).json({ error: message });
   }
 });
 

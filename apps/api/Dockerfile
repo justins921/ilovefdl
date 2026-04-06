@@ -25,4 +25,4 @@ RUN npm run build --workspace=apps/api
 # Production
 ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["sh", "-c", "echo 'Pushing schema to database...' ; timeout 30 ./node_modules/.bin/prisma db push --schema=apps/api/prisma/schema.prisma --skip-generate || echo 'Schema push skipped' ; echo 'Starting server on port ${PORT:-4000}...' ; node apps/api/dist/index.js"]
+CMD ["sh", "-c", "echo 'Pushing schema to database...' && npx prisma db push --schema=apps/api/prisma/schema.prisma --skip-generate --accept-data-loss && echo 'Schema push complete.' && echo 'Starting server on port ${PORT:-4000}...' && node apps/api/dist/index.js"]
