@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I Love FDL — QA Checklist</title>
+<style>
+  @media print {
+    body { font-size: 11px; margin: 0.5in; }
+    .no-print { display: none; }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 24px;
+    color: #1a1a1a;
+    line-height: 1.4;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .urls { background: #f5f5f5; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px; font-size: 12px; }
+  .urls strong { display: inline-block; width: 70px; }
+  .urls code { background: #e8e8e8; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+  h2 { font-size: 15px; margin-top: 28px; margin-bottom: 8px; border-bottom: 2px solid #1a1a1a; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
+  th { text-align: left; background: #f0f0f0; padding: 6px 8px; font-weight: 600; border: 1px solid #ddd; }
+  td { padding: 6px 8px; border: 1px solid #ddd; vertical-align: top; }
+  td:first-child { width: 32px; text-align: center; font-weight: 600; color: #888; }
+  td:last-child { width: 60px; text-align: center; }
+  .checkbox { width: 16px; height: 16px; border: 2px solid #999; border-radius: 3px; display: inline-block; }
+  .section-note { font-size: 11px; color: #888; font-style: italic; margin-bottom: 12px; }
+  .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 11px; color: #999; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<h1>I Love FDL — QA Checklist</h1>
+<div class="subtitle">Date: ______________ &nbsp;&nbsp; Tester: ______________ &nbsp;&nbsp; Branch/Commit: ______________</div>
+
+<div class="urls">
+  <div><strong>Frontend:</strong> <code>https://ilovefdl.com</code></div>
+  <div><strong>API:</strong> <code>https://ilovefdlapi-production.up.railway.app</code></div>
+  <div><strong>Stripe Test Card:</strong> <code>4242 4242 4242 4242</code> &nbsp; Exp: any future date &nbsp; CVC: any 3 digits</div>
+</div>
+
+<h2>1. Infrastructure Health</h2>
+<p class="section-note">Start here — if these fail, nothing else will work.</p>
+<table>
+  <tr><th>#</th><th>Test</th><th>How to Check</th><th>Pass</th></tr>
+  <tr><td>1.1</td><td>Frontend loads</td><td>Visit ilovefdl.com — page renders, no white screen</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>1.2</td><td>API health check</td><td>Visit API /health endpoint — returns 200 OK</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>1.3</td><td>No CORS errors</td><td>Open browser DevTools Console on ilovefdl.com — no red CORS errors</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>1.4</td><td>HTTPS valid</td><td>Both URLs show lock icon in browser bar</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>2. Public Pages (No Login)</h2>
+<table>
+  <tr><th>#</th><th>Test</th><th>How to Check</th><th>Pass</th></tr>
+  <tr><td>2.1</td><td>Homepage</td><td>/ — hero section, latest posts, specials all render</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.2</td><td>Marketplace</td><td>/marketplace — products load, filters and sorting work</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.3</td><td>Product detail</td><td>Click a product — images, price, description, Add to Cart visible</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.4</td><td>Vendors listing</td><td>/vendors — vendor cards appear with names/logos</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.5</td><td>Vendor storefront</td><td>Click a vendor — store page loads with their products</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.6</td><td>News</td><td>/news — articles load; click one — full article renders</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.7</td><td>Bars &amp; Specials</td><td>/bars and /specials — listings load with data</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.8</td><td>Add to Cart</td><td>Add a product — cart icon in header updates</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.9</td><td>Cart page</td><td>/cart — items show with correct quantities and prices</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>2.10</td><td>Cart persists</td><td>Refresh page — cart items still present</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>3. Authentication</h2>
+<table>
+  <tr><th>#</th><th>Test</th><th>How to Check</th><th>Pass</th></tr>
+  <tr><td>3.1</td><td>Register</td><td>/auth — create new account, success message or redirect</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>3.2</td><td>Login</td><td>Log out, log back in — redirects to appropriate page</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>3.3</td><td>Forgot password</td><td>/auth/forgot-password — form submits without error</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>3.4</td><td>Dashboard link</td><td>Logged in as vendor — "Dashboard" appears in header menu</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>3.5</td><td>Route protection</td><td>Visit /dashboard logged out — redirected or shown auth prompt</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>4. Vendor Dashboard (Login as Vendor)</h2>
+<table>
+  <tr><th>#</th><th>Test</th><th>How to Check</th><th>Pass</th></tr>
+  <tr><td>4.1</td><td>Dashboard home</td><td>/dashboard — stats cards, recent orders, quick actions render</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.2</td><td>Sidebar nav (desktop)</td><td>All 10 links visible and clickable in left sidebar</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.3</td><td>Mobile nav</td><td>Narrow browser — hamburger menu opens with all pages</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.4</td><td>Products</td><td>/dashboard/products — product list loads, Add Product works</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.5</td><td>Orders</td><td>/dashboard/orders — orders load, filter tabs work, rows expand</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.6</td><td>Settings — Store</td><td>Store Details tab loads pre-filled, tip box visible</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.7</td><td>Settings — Save</td><td>Edit a field, Save — green success banner appears</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.8</td><td>Settings — SEO</td><td>SEO tab — slug builder with URL prefix, live Google preview</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.9</td><td>Settings — Payment</td><td>Payment tab — Stripe connection status shows correctly</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.10</td><td>Settings — Social</td><td>Social tab — enter a URL, icon turns teal</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.11</td><td>Coupons</td><td>/dashboard/coupons — list loads, create coupon works</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.12</td><td>Reviews</td><td>/dashboard/reviews — reviews list with star ratings</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.13</td><td>Reports</td><td>/dashboard/reports — revenue and product data renders</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.14</td><td>Messages</td><td>/dashboard/messages — conversation list loads</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.15</td><td>Shipping</td><td>/dashboard/shipping — shipping profiles load</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>4.16</td><td>Withdraw</td><td>/dashboard/withdraw — balance info displays</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>5. E-Commerce Flow (Full Purchase)</h2>
+<p class="section-note">Test the complete buy flow end to end.</p>
+<table>
+  <tr><th>#</th><th>Test</th><th>How to Check</th><th>Pass</th></tr>
+  <tr><td>5.1</td><td>Add to cart</td><td>Add product from marketplace — cart count updates</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>5.2</td><td>Checkout loads</td><td>/checkout — shipping form and order summary visible</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>5.3</td><td>Stripe payment</td><td>Enter test card 4242... — payment processes successfully</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>5.4</td><td>Order confirmation</td><td>Success page shows order number and details</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>5.5</td><td>Order in dashboard</td><td>Vendor sees new order appear in /dashboard/orders</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>6. Integrations (If API Keys Configured)</h2>
+<table>
+  <tr><th>#</th><th>Test</th><th>How to Check</th><th>Pass</th></tr>
+  <tr><td>6.1</td><td>Stripe Connect</td><td>Payment tab — "Connect Stripe Account" initiates OAuth flow</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>6.2</td><td>Square</td><td>/dashboard/integrations — Square connect initiates</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>6.3</td><td>Shopify</td><td>/dashboard/integrations — Shopify connect initiates</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>6.4</td><td>Etsy</td><td>/dashboard/integrations — Etsy connect initiates</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>7. Environment Variables</h2>
+<p class="section-note">Verify these are set in Vercel and Railway dashboards.</p>
+<table>
+  <tr><th>#</th><th>Variable</th><th>Where</th><th>Set</th></tr>
+  <tr><td>7.1</td><td>NEXT_PUBLIC_API_URL</td><td>Vercel</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.2</td><td>NEXT_PUBLIC_SITE_URL</td><td>Vercel</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.3</td><td>DATABASE_URL</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.4</td><td>JWT_SECRET</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.5</td><td>STRIPE_SECRET_KEY</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.6</td><td>STRIPE_WEBHOOK_SECRET</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.7</td><td>CORS_ORIGIN = https://ilovefdl.com</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.8</td><td>APP_URL = https://ilovefdl.com</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+  <tr><td>7.9</td><td>SMTP_HOST / SMTP_USER / SMTP_PASS</td><td>Railway</td><td><span class="checkbox"></span></td></tr>
+</table>
+
+<h2>Notes / Issues Found</h2>
+<div style="border: 1px solid #ddd; border-radius: 6px; min-height: 180px; padding: 12px;">
+  <div style="border-bottom: 1px dotted #e0e0e0; height: 28px;"></div>
+  <div style="border-bottom: 1px dotted #e0e0e0; height: 28px;"></div>
+  <div style="border-bottom: 1px dotted #e0e0e0; height: 28px;"></div>
+  <div style="border-bottom: 1px dotted #e0e0e0; height: 28px;"></div>
+  <div style="border-bottom: 1px dotted #e0e0e0; height: 28px;"></div>
+  <div style="height: 28px;"></div>
+</div>
+
+<div class="footer">
+  <span>I Love FDL — QA Checklist</span>
+  <span>Total: 45 checks</span>
+</div>
+
+</body>
+</html>
