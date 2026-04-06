@@ -116,7 +116,7 @@ export default function AccountPage() {
             </div>
             <div>
               <p className="text-xs text-primary/50 uppercase tracking-wider mb-1">Member Since</p>
-              <p className="text-sm font-medium text-primary">{formatDate(user.createdAt)}</p>
+              <p className="text-sm font-medium text-primary">{user.createdAt ? formatDate(user.createdAt) : 'N/A'}</p>
             </div>
             <div>
               <p className="text-xs text-primary/50 uppercase tracking-wider mb-1">Account Type</p>

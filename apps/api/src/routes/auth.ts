@@ -51,6 +51,8 @@ router.post('/register', async (req: Request, res: Response) => {
           name: user.name,
           role: user.role,
           avatarUrl: user.avatarUrl,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         },
       },
     });
@@ -126,6 +128,8 @@ router.post('/register-vendor', async (req: Request, res: Response) => {
           name: user.name,
           role: user.role,
           avatarUrl: user.avatarUrl,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         },
       },
     });
@@ -177,6 +181,8 @@ router.post('/login', async (req: Request, res: Response) => {
           name: user.name,
           role: user.role,
           avatarUrl: user.avatarUrl,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         },
       },
     });
