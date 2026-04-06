@@ -95,7 +95,7 @@ export class ApiError extends Error {
   public readonly details?: Record<string, string[]>;
 
   constructor(response: ApiErrorResponse) {
-    super(response.message);
+    super(response.message || response.error || 'Unknown error');
     this.name = 'ApiError';
     this.statusCode = response.statusCode;
     this.details = response.details;
@@ -159,7 +159,13 @@ export class ApiClient {
     if (!response.ok) {
       let errorBody: ApiErrorResponse;
       try {
-        errorBody = (await response.json()) as ApiErrorResponse;
+        const json = await response.json();
+        errorBody = {
+          error: json.error || 'UnknownError',
+          message: json.message || json.error || `Request failed with status ${response.status}`,
+          statusCode: json.statusCode || response.status,
+          details: json.details,
+        };
       } catch {
         errorBody = {
           error: 'UnknownError',
