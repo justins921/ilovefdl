@@ -426,19 +426,19 @@ export class ApiClient {
 
   /** Register a push notification token for the current user */
   async registerPushToken(data: RegisterPushTokenInput): Promise<ApiResponse<PushToken>> {
-    return this.post<ApiResponse<PushToken>>('/push-tokens', data);
+    return this.post<ApiResponse<PushToken>>('/push/register', data);
   }
 
   /** Update notification preferences for the current user */
   async updateNotificationPreferences(
     data: UpdateNotificationPreferenceInput,
   ): Promise<ApiResponse<NotificationPreference>> {
-    return this.put<ApiResponse<NotificationPreference>>('/notification-preferences', data);
+    return this.put<ApiResponse<NotificationPreference>>('/push/preferences', data);
   }
 
   /** Get notification preferences for the current user */
   async getNotificationPreferences(): Promise<ApiResponse<NotificationPreference>> {
-    return this.get<ApiResponse<NotificationPreference>>('/notification-preferences');
+    return this.get<ApiResponse<NotificationPreference>>('/push/preferences');
   }
 
   // ─── INTEGRATIONS ──────────────────────────────────────
