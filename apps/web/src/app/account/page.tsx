@@ -120,7 +120,11 @@ export default function AccountPage() {
             </div>
             <div>
               <p className="text-xs text-primary/50 uppercase tracking-wider mb-1">Account Type</p>
-              <p className="text-sm font-medium text-primary capitalize">{user.role.toLowerCase()}</p>
+              <p className="text-sm font-medium text-primary capitalize">
+                {user.role === 'USER' ? 'Member' :
+                 user.role === 'BAR_OWNER' ? 'Bar / Restaurant Owner' :
+                 user.role.toLowerCase().replace('_', ' ')}
+              </p>
             </div>
           </div>
         </div>

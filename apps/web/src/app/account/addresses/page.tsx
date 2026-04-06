@@ -160,8 +160,10 @@ export default function AddressesPage() {
         message = err.message;
       }
       // Check for common issues
-      if (message.includes('401') || message.includes('Unauthorized')) {
+      if (message.includes('401') || message.includes('Unauthorized') || message.includes('Authentication')) {
         message = 'Your session has expired. Please log out and log back in.';
+      } else if (message.includes('Failed to create') || message.includes('Failed to update')) {
+        message = 'Unable to save your address right now. Please try again in a few minutes.';
       }
       setError(message);
     } finally {
