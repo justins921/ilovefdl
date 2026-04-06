@@ -74,6 +74,36 @@ export interface WpUser {
   avatar_urls: Record<string, string>;
 }
 
+export interface WcProduct {
+  id: number;
+  name: string;
+  slug: string;
+  parent: number;
+  type: string;
+  description: string;
+  short_description: string;
+  sku: string;
+  prices: {
+    price: string;
+    regular_price: string;
+    sale_price: string;
+    currency_code: string;
+    currency_minor_unit: number;
+  };
+  images: Array<{
+    id: number;
+    src: string;
+    thumbnail: string;
+    name: string;
+    alt: string;
+  }>;
+  categories: Array<{ id: number; name: string; slug: string }>;
+  tags: Array<{ id: number; name: string; slug: string }>;
+  stock_status: string;
+  stock_quantity: number | null;
+  permalink: string;
+}
+
 // ─── helpers ─────────────────────────────────────────────
 
 async function sleep(ms: number): Promise<void> {
@@ -184,6 +214,30 @@ export async function fetchAllMedia(): Promise<WpMedia[]> {
 
 export async function fetchAllUsers(): Promise<WpUser[]> {
   return fetchAllPages<WpUser>("users");
+}
+
+/**
+ * Fetch products from the WooCommerce Store API.
+ * This endpoint is public and includes pricing data.
+ */
+export async function fetchAllWcProducts(): Promise<WcProduct[]> {
+  const WC_STORE_URL = "https://ilovefdl.com/wp-json/wc/store/v1";
+  const results: WcProduct[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${WC_STORE_URL}/products?per_page=${PER_PAGE}&page=${page}`;
+    console.log(`  Fetching WC products page ${page}...`);
+    const response = await fetchWithRetry(url);
+    const data = (await response.json()) as WcProduct[];
+    results.push(...data);
+    // If we got fewer than PER_PAGE, we've fetched everything
+    hasMore = data.length === PER_PAGE;
+    page++;
+  }
+
+  return results;
 }
 
 /**
