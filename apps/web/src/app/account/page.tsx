@@ -164,7 +164,7 @@ export default function AccountPage() {
             <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
           </Link>
           <Link
-            href="/dashboard/messages"
+            href="/account/messages"
             className="bg-white rounded-xl border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group"
           >
             <div className="flex items-center gap-3">

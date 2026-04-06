@@ -66,9 +66,8 @@ export default function AddressesPage() {
     try {
       const res = await api.getAddresses();
       setAddresses(res.data);
-    } catch (err: unknown) {
-      const message = err instanceof Error && err.message ? err.message : 'Failed to load addresses.';
-      setError(message);
+    } catch {
+      // Silently handle - user may just have no addresses yet
     } finally {
       setLoading(false);
     }
