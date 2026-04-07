@@ -25,7 +25,7 @@ interface ProductFormData {
   description: string;
   categoryTags: string;
   inventory: string;
-  images: string[];
+  existingImages: string[];
   isActive: boolean;
   vendorId: string;
 }
@@ -37,7 +37,7 @@ const emptyForm: ProductFormData = {
   description: '',
   categoryTags: '',
   inventory: '0',
-  images: [''],
+  existingImages: [],
   isActive: true,
   vendorId: '',
 };
@@ -57,6 +57,8 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -106,6 +108,8 @@ export default function ProductsPage() {
   function openAddModal() {
     setEditingProduct(null);
     setForm(emptyForm);
+    setPendingFiles([]);
+    setFilePreviews([]);
     setFormError(null);
     setModalOpen(true);
   }
@@ -121,11 +125,12 @@ export default function ProductsPage() {
       description: product.description || '',
       categoryTags: product.categoryTags.join(', '),
       inventory: String(product.inventory),
-      images:
-        product.images.length > 0 ? [...product.images] : [''],
+      existingImages: product.images.length > 0 ? [...product.images] : [],
       isActive: product.isActive,
       vendorId: product.vendorId,
     });
+    setPendingFiles([]);
+    setFilePreviews([]);
     setFormError(null);
     setModalOpen(true);
   }
@@ -134,6 +139,8 @@ export default function ProductsPage() {
     setModalOpen(false);
     setEditingProduct(null);
     setForm(emptyForm);
+    setPendingFiles([]);
+    setFilePreviews([]);
     setFormError(null);
   }
 
@@ -143,23 +150,32 @@ export default function ProductsPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function updateImage(index: number, value: string) {
-    setForm((prev) => {
-      const images = [...prev.images];
-      images[index] = value;
-      return { ...prev, images };
-    });
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setPendingFiles((prev) => [...prev, ...files]);
+    // Generate previews
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setFilePreviews((prev) => [...prev, ev.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
   }
 
-  function addImageField() {
-    setForm((prev) => ({ ...prev, images: [...prev.images, ''] }));
+  function removeExistingImage(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      existingImages: prev.existingImages.filter((_, i) => i !== index),
+    }));
   }
 
-  function removeImageField(index: number) {
-    setForm((prev) => {
-      const images = prev.images.filter((_, i) => i !== index);
-      return { ...prev, images: images.length === 0 ? [''] : images };
-    });
+  function removePendingFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index));
   }
 
   // ─── Submit Handler ──────────────────────────────────────
@@ -200,14 +216,28 @@ export default function ProductsPage() {
       return;
     }
 
-    const images = form.images
-      .map((url) => url.trim())
-      .filter((url) => url.length > 0);
-
     const categoryTags = form.categoryTags
       .split(',')
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
+
+    setSaving(true);
+
+    // Upload any new image files first
+    let uploadedPaths: string[] = [];
+    if (pendingFiles.length > 0) {
+      try {
+        const uploadRes = await api.uploadImages(pendingFiles);
+        uploadedPaths = uploadRes.data;
+      } catch {
+        setFormError('Failed to upload images. Please try again.');
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Combine existing images with newly uploaded ones
+    const images = [...form.existingImages, ...uploadedPaths];
 
     const payload = {
       name,
@@ -220,11 +250,8 @@ export default function ProductsPage() {
       inventory,
       isActive: form.isActive,
       externalPlatform: ExternalPlatform.NATIVE,
-      // Admins can reassign the product to a different vendor
       ...(isAdmin && form.vendorId ? { vendorId: form.vendorId } : {}),
     };
-
-    setSaving(true);
 
     try {
       if (editingProduct) {
@@ -675,36 +702,71 @@ export default function ProductsPage() {
                 <label className="block text-sm font-medium text-primary mb-1.5">
                   Images
                 </label>
-                <div className="space-y-2">
-                  {form.images.map((url, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="url"
-                        value={url}
-                        onChange={(e) => updateImage(index, e.target.value)}
-                        placeholder="https://example.com/image.jpg"
-                        className="input-field"
-                      />
-                      {form.images.length > 1 && (
+
+                {/* Existing images (already uploaded) */}
+                {form.existingImages.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {form.existingImages.map((url, index) => (
+                      <div key={`existing-${index}`} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Product ${index + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg border border-light"
+                        />
                         <button
                           type="button"
-                          onClick={() => removeImageField(index)}
-                          className="p-2 rounded-lg text-primary/40 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                          onClick={() => removeExistingImage(index)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3 h-3" />
                         </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={addImageField}
-                  className="mt-2 inline-flex items-center text-sm text-teal hover:text-teal/80 transition-colors"
-                >
-                  <ImagePlus className="w-4 h-4 mr-1" />
-                  Add another image
-                </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New file previews */}
+                {filePreviews.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {filePreviews.map((preview, index) => (
+                      <div key={`new-${index}`} className="relative group">
+                        <img
+                          src={preview}
+                          alt={`New ${index + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg border-2 border-teal/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePendingFile(index)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-0 left-0 right-0 bg-teal text-white text-[10px] text-center rounded-b-lg">
+                          New
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload button */}
+                <label className="inline-flex items-center gap-2 px-4 py-2 bg-light text-primary text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors cursor-pointer">
+                  <ImagePlus className="w-4 h-4" />
+                  {form.existingImages.length + pendingFiles.length === 0
+                    ? 'Upload Images'
+                    : 'Add More Images'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-xs text-primary/40 mt-1">
+                  JPEG, PNG, WebP, or GIF. Max 10MB per image.
+                </p>
               </div>
 
               {/* Active Toggle */}
