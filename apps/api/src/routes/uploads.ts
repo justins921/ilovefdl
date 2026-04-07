@@ -71,4 +71,56 @@ router.post(
   }
 );
 
+/**
+ * POST /uploads/migrate
+ * Migration-only endpoint — accepts image by URL, downloads and processes it.
+ * Secured by MIGRATION_API_KEY header instead of JWT auth.
+ */
+router.post('/migrate', async (req: Request, res: Response) => {
+  try {
+    const apiKey = req.headers['x-migration-key'] as string;
+    if (!process.env.MIGRATION_API_KEY || apiKey !== process.env.MIGRATION_API_KEY) {
+      res.status(401).json({ error: 'Invalid migration API key' });
+      return;
+    }
+
+    const { url } = req.body as { url: string };
+    if (!url) {
+      res.status(400).json({ error: 'url is required' });
+      return;
+    }
+
+    // Download the image from the URL
+    const response = await fetch(url);
+    if (!response.ok) {
+      res.status(400).json({ error: `Failed to fetch image: HTTP ${response.status}` });
+      return;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') || '';
+
+    // Validate it's an image
+    if (!contentType.startsWith('image/')) {
+      res.status(400).json({ error: `Not an image: ${contentType}` });
+      return;
+    }
+
+    const id = crypto.randomBytes(12).toString('hex');
+    const filename = `${id}.webp`;
+    const filepath = path.join(IMAGES_DIR, filename);
+
+    await sharp(buffer)
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toFile(filepath);
+
+    const imagePath = `/uploads/images/${filename}`;
+    res.json({ data: imagePath });
+  } catch (error) {
+    console.error('Migration upload error:', error);
+    res.status(500).json({ error: 'Failed to upload migrated image' });
+  }
+});
+
 export default router;

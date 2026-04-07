@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
-import { formatDate, formatCategoryName } from '@/lib/utils';
+import { formatDate, formatCategoryName, resolveImageUrl } from '@/lib/utils';
 import BlogPostCard from '@/components/BlogPostCard';
 import type { BlogPost, BlogComment } from '@ilovefdl/shared';
 
@@ -217,7 +217,7 @@ export default function BlogPostPage({
         {post.featuredImage && (
           <div className="aspect-[16/9] rounded-xl overflow-hidden mb-10">
             <img
-              src={post.featuredImage}
+              src={resolveImageUrl(post.featuredImage)}
               alt={post.title}
               className="w-full h-full object-cover"
             />

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Newspaper, Calendar, User } from 'lucide-react';
-import { formatDate, formatCategoryName } from '@/lib/utils';
+import { formatDate, formatCategoryName, resolveImageUrl } from '@/lib/utils';
 import type { BlogPost } from '@ilovefdl/shared';
 
 interface BlogPostCardProps {
@@ -15,7 +15,7 @@ export default function BlogPostCard({ post }: BlogPostCardProps) {
       <div className="aspect-[16/9] bg-light relative overflow-hidden">
         {post.featuredImage ? (
           <Image
-            src={post.featuredImage}
+            src={resolveImageUrl(post.featuredImage)}
             alt={post.title}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
