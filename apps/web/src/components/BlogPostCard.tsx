@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Newspaper, Calendar, User } from 'lucide-react';
 import { formatDate, formatCategoryName } from '@/lib/utils';
 import type { BlogPost } from '@ilovefdl/shared';
@@ -13,10 +14,12 @@ export default function BlogPostCard({ post }: BlogPostCardProps) {
       {/* Featured Image */}
       <div className="aspect-[16/9] bg-light relative overflow-hidden">
         {post.featuredImage ? (
-          <img
+          <Image
             src={post.featuredImage}
             alt={post.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal/10 to-accent/10">

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ShoppingBag } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import type { Product } from '@ilovefdl/shared';
@@ -15,10 +16,12 @@ export default function ProductCard({ product }: ProductCardProps) {
       {/* Image */}
       <div className="aspect-square bg-light relative overflow-hidden">
         {imageUrl ? (
-          <img
+          <Image
             src={imageUrl}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-light to-teal/10">
