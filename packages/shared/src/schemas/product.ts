@@ -27,7 +27,7 @@ export const createProductSchema = z.object({
     .optional()
     .nullable(),
   images: z
-    .array(z.string().url('Each image must be a valid URL'))
+    .array(z.string().min(1, 'Image path cannot be empty'))
     .max(20, 'Maximum of 20 images allowed')
     .default([]),
   categoryTags: z
