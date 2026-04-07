@@ -25,6 +25,7 @@ import {
   Package,
   CheckCircle,
   XCircle,
+  ClipboardList,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -49,7 +50,7 @@ import {
 
 // ─── TYPES ──────────────────────────────────────────────
 
-type ActiveTab = 'overview' | 'posts' | 'bars' | 'products' | 'vendors' | 'orders' | 'refunds' | 'users';
+type ActiveTab = 'overview' | 'applications' | 'posts' | 'bars' | 'products' | 'vendors' | 'orders' | 'refunds' | 'users';
 
 interface DashboardStats {
   vendorCount: number;
@@ -62,6 +63,7 @@ interface DashboardStats {
 
 const navItems: { id: ActiveTab; label: string; icon: typeof BarChart3 }[] = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'applications', label: 'Applications', icon: ClipboardList },
   { id: 'posts', label: 'Blog Posts', icon: Newspaper },
   { id: 'bars', label: 'Bars & Specials', icon: Beer },
   { id: 'products', label: 'Products', icon: ShoppingBag },
@@ -152,6 +154,7 @@ export default function AdminPage() {
 
         <div className="p-4 sm:p-6 lg:p-8">
           {activeTab === 'overview' && <OverviewSection />}
+          {activeTab === 'applications' && <ApplicationsSection />}
           {activeTab === 'posts' && <BlogPostsSection />}
           {activeTab === 'bars' && <BarsSection />}
           {activeTab === 'products' && <ProductsSection />}
@@ -1766,6 +1769,218 @@ function ProductsSection() {
   );
 }
 
+// ─── APPLICATIONS SECTION ──────────────────────────────
+
+interface BarWithOwner extends Bar {
+  owner?: { id: string; name: string | null; email: string } | null;
+  specialCount?: number;
+}
+
+function ApplicationsSection() {
+  const [pendingVendors, setPendingVendors] = useState<Vendor[]>([]);
+  const [pendingBars, setPendingBars] = useState<BarWithOwner[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchApplications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tokenStr = localStorage.getItem('ilovefdl_token');
+      if (tokenStr) api.setToken(tokenStr);
+
+      const [vendorsRes, barsRes] = await Promise.all([
+        api.adminGetVendors({ status: 'PENDING' }),
+        api.adminGetBars({ status: 'pending' }),
+      ]);
+
+      setPendingVendors(vendorsRes.data);
+      setPendingBars(barsRes.data);
+    } catch {
+      setError('Failed to load applications.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
+
+  async function handleVendorAction(vendorId: string, status: 'APPROVED' | 'SUSPENDED') {
+    setActionLoading(vendorId);
+    try {
+      await api.adminUpdateVendorStatus(vendorId, status);
+      await fetchApplications();
+    } catch {
+      setError(`Failed to ${status === 'APPROVED' ? 'approve' : 'deny'} vendor.`);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleBarAction(barId: string, approved: boolean) {
+    setActionLoading(barId);
+    try {
+      await api.adminApproveBar(barId, approved);
+      await fetchApplications();
+    } catch {
+      setError(`Failed to ${approved ? 'approve' : 'deny'} bar/restaurant.`);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  const totalPending = pendingVendors.length + pendingBars.length;
+
+  return (
+    <>
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+          <button onClick={() => setError(null)} className="ml-auto">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="p-12 flex justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+        </div>
+      ) : totalPending === 0 ? (
+        <div className="bg-white rounded-xl border border-light p-12 text-center">
+          <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-primary mb-1">All caught up!</h2>
+          <p className="text-primary/60 text-sm">No pending applications to review.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {/* Pending Vendor Applications */}
+          {pendingVendors.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+                <Store className="w-5 h-5" />
+                Vendor Applications
+                <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                  {pendingVendors.length}
+                </span>
+              </h2>
+              <div className="space-y-3">
+                {pendingVendors.map((vendor) => (
+                  <div
+                    key={vendor.id}
+                    className="bg-white rounded-xl border border-light p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-primary">{vendor.businessName}</h3>
+                      <p className="text-xs text-primary/50 mt-0.5">
+                        {vendor.user?.name || vendor.user?.email || 'Unknown applicant'}
+                        {vendor.user?.email && ` — ${vendor.user.email}`}
+                      </p>
+                      {vendor.description && (
+                        <p className="text-xs text-primary/60 mt-1 line-clamp-2">{vendor.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-primary/40">
+                        {vendor.phone && <span>{vendor.phone}</span>}
+                        {vendor.address && <span>{vendor.address}</span>}
+                        {vendor.website && <span>{vendor.website}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleVendorAction(vendor.id, 'APPROVED')}
+                        disabled={actionLoading === vendor.id}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === vendor.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleVendorAction(vendor.id, 'SUSPENDED')}
+                        disabled={actionLoading === vendor.id}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Bar/Restaurant Applications */}
+          {pendingBars.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+                <Beer className="w-5 h-5" />
+                Bar / Restaurant Applications
+                <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                  {pendingBars.length}
+                </span>
+              </h2>
+              <div className="space-y-3">
+                {pendingBars.map((bar) => (
+                  <div
+                    key={bar.id}
+                    className="bg-white rounded-xl border border-light p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-primary">{bar.name}</h3>
+                      <p className="text-xs text-primary/50 mt-0.5">
+                        {bar.owner?.name || bar.owner?.email || 'Unknown applicant'}
+                        {bar.owner?.email && ` — ${bar.owner.email}`}
+                      </p>
+                      {bar.description && (
+                        <p className="text-xs text-primary/60 mt-1 line-clamp-2">{bar.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-primary/40">
+                        <span>{bar.address}</span>
+                        {bar.phone && <span>{bar.phone}</span>}
+                        {bar.website && <span>{bar.website}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleBarAction(bar.id, true)}
+                        disabled={actionLoading === bar.id}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === bar.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleBarAction(bar.id, false)}
+                        disabled={actionLoading === bar.id}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── VENDORS SECTION ────────────────────────────────────
 
 function VendorsSection() {
@@ -1908,13 +2123,41 @@ function VendorsSection() {
                       {vendor.products?.length ?? '-'}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => openEdit(vendor)}
-                        className="text-primary/50 hover:text-primary transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {vendor.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={async () => {
+                                await api.adminUpdateVendorStatus(vendor.id, 'APPROVED');
+                                fetchVendors();
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                              title="Approve"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Approve
+                            </button>
+                            <button
+                              onClick={async () => {
+                                await api.adminUpdateVendorStatus(vendor.id, 'SUSPENDED');
+                                fetchVendors();
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors"
+                              title="Deny"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Deny
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => openEdit(vendor)}
+                          className="text-primary/50 hover:text-primary transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
