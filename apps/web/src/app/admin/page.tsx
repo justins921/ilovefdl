@@ -2542,38 +2542,83 @@ function RefundsAdminSection() {
 // ─── USERS ADMIN SECTION ───────────────────────────────
 
 function UsersAdminSection() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchUsers() {
-      setLoading(true);
-      try {
-        const params: Record<string, string | number> = { limit: 100 };
-        if (roleFilter !== 'ALL') params.role = roleFilter;
-        const res = await api.adminGetUsers(params as Parameters<typeof api.adminGetUsers>[0]);
-        setUsers(res.data);
-      } catch { /* */ } finally {
-        setLoading(false);
-      }
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string | number> = { limit: 100 };
+      if (roleFilter !== 'ALL') params.role = roleFilter;
+      const res = await api.adminGetUsers(params as Parameters<typeof api.adminGetUsers>[0]);
+      setUsers(res.data);
+    } catch { /* */ } finally {
+      setLoading(false);
     }
-    fetchUsers();
   }, [roleFilter]);
 
-  const roles = ['ALL', 'USER', 'VENDOR', 'EDITOR', 'ADMIN'];
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  async function handleRoleChange(userId: string, newRole: string) {
+    if (userId === currentUser?.id) {
+      setError('You cannot change your own role.');
+      return;
+    }
+    setUpdatingId(userId);
+    setError(null);
+    try {
+      await api.adminUpdateUserRole(userId, newRole);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, role: newRole as UserType['role'] } : u))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update role.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  const filterRoles = ['ALL', 'USER', 'VENDOR', 'BAR_OWNER', 'CONTRACTOR', 'EDITOR', 'ADMIN'];
+  const allRoles = ['USER', 'VENDOR', 'BAR_OWNER', 'CONTRACTOR', 'EDITOR', 'ADMIN'];
 
   const roleColors: Record<string, string> = {
     USER: 'bg-gray-100 text-gray-800',
     VENDOR: 'bg-teal/10 text-teal',
+    BAR_OWNER: 'bg-amber-100 text-amber-800',
+    CONTRACTOR: 'bg-orange-100 text-orange-800',
     EDITOR: 'bg-blue-100 text-blue-800',
     ADMIN: 'bg-purple-100 text-purple-800',
   };
 
+  const roleLabels: Record<string, string> = {
+    USER: 'Member',
+    VENDOR: 'Vendor',
+    BAR_OWNER: 'Bar / Restaurant Owner',
+    CONTRACTOR: 'Contractor',
+    EDITOR: 'Editor',
+    ADMIN: 'Admin',
+  };
+
   return (
     <>
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+          <button onClick={() => setError(null)} className="ml-auto">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {roles.map((r) => (
+        {filterRoles.map((r) => (
           <button
             key={r}
             onClick={() => setRoleFilter(r)}
@@ -2583,7 +2628,7 @@ function UsersAdminSection() {
                 : 'bg-white text-primary/60 border border-light hover:text-primary'
             }`}
           >
-            {r === 'ALL' ? 'All' : r.charAt(0) + r.slice(1).toLowerCase()}
+            {r === 'ALL' ? 'All' : roleLabels[r] || r}
           </button>
         ))}
       </div>
@@ -2617,9 +2662,31 @@ function UsersAdminSection() {
                     </td>
                     <td className="px-6 py-4 text-sm text-primary/60">{u.email}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleColors[u.role] || 'bg-gray-100 text-gray-800'}`}>
-                        {u.role}
-                      </span>
+                      {u.id === currentUser?.id ? (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleColors[u.role] || 'bg-gray-100 text-gray-800'}`}>
+                          {roleLabels[u.role] || u.role} (you)
+                        </span>
+                      ) : (
+                        <div className="relative">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            disabled={updatingId === u.id}
+                            className={`appearance-none pl-2.5 pr-7 py-0.5 rounded-full text-xs font-medium border-0 cursor-pointer focus:ring-2 focus:ring-primary/20 ${
+                              roleColors[u.role] || 'bg-gray-100 text-gray-800'
+                            } ${updatingId === u.id ? 'opacity-50' : ''}`}
+                          >
+                            {allRoles.map((role) => (
+                              <option key={role} value={role}>
+                                {roleLabels[role] || role}
+                              </option>
+                            ))}
+                          </select>
+                          {updatingId === u.id && (
+                            <Loader2 className="absolute right-1 top-1 w-3 h-3 animate-spin" />
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-primary/60">
                       {formatDate(u.createdAt)}

@@ -242,4 +242,42 @@ router.get('/users', requireAuth, requireRole(['ADMIN']), async (req: Request, r
   }
 });
 
+// PUT /admin/users/:id/role — change a user's role
+const userRoleSchema = z.object({
+  role: z.enum(['ADMIN', 'VENDOR', 'BAR_OWNER', 'CONTRACTOR', 'EDITOR', 'USER']),
+});
+
+router.put('/users/:id/role', requireAuth, requireRole(['ADMIN']), async (req: Request, res: Response) => {
+  try {
+    const parsed = userRoleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Prevent admins from demoting themselves
+    if (req.params.id === req.user!.id && parsed.data.role !== 'ADMIN') {
+      res.status(400).json({ error: 'You cannot change your own role' });
+      return;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { role: parsed.data.role },
+      select: { id: true, email: true, name: true, role: true, avatarUrl: true, createdAt: true },
+    });
+
+    res.json({ data: updated });
+  } catch (error) {
+    console.error('Update user role error:', error);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
 export default router;
