@@ -692,6 +692,11 @@ export class ApiClient {
     return this.get<PaginatedResponse<User>>('/admin/users', params as Record<string, string | number | boolean | undefined>);
   }
 
+  /** Admin: update a user's role */
+  async adminUpdateUserRole(id: string, role: string): Promise<ApiResponse<User>> {
+    return this.put<ApiResponse<User>>(`/admin/users/${id}/role`, { role });
+  }
+
   /** Admin: list all bars */
   async adminGetBars(params?: { status?: string }): Promise<ApiResponse<Bar[]>> {
     return this.get<ApiResponse<Bar[]>>('/admin/bars', params as Record<string, string | number | boolean | undefined>);

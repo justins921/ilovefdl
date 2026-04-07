@@ -6,6 +6,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'www.ilovefdl.com' },
       { protocol: 'https', hostname: '*.ilovefdl.com' },
       { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'https', hostname: '*.railway.app' },
+      { protocol: 'https', hostname: '*.up.railway.app' },
     ],
   },
   transpilePackages: ['@ilovefdl/shared'],

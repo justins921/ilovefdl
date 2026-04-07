@@ -169,12 +169,13 @@ async function main(): Promise<void> {
     }
     console.log("");
 
-    // ── Step 4: Download & optimise featured images ────────
+    // ── Step 4: Map featured images to WP source URLs ──────
+    // Use the original WordPress URLs directly so images work
+    // without needing to host downloaded copies on our server.
 
-    console.log("Downloading featured images...");
+    console.log("Mapping featured images...");
     const mediaMap: Record<number, string> = {};
 
-    // Collect unique featured media IDs from posts
     const featuredMediaIds = new Set(
       wpPosts
         .map((p) => p.featured_media)
@@ -189,15 +190,9 @@ async function main(): Promise<void> {
         continue;
       }
 
-      console.log(`  Processing media ${mediaId}: ${media.source_url}`);
-      const localPath = await downloadImage(media.source_url, MEDIA_OUTPUT_DIR);
-      if (localPath) {
-        // Store a relative path suitable for serving
-        mediaMap[mediaId] = path.relative(process.cwd(), localPath);
-        stats.imagesDownloaded++;
-      } else {
-        stats.imageErrors++;
-      }
+      mediaMap[mediaId] = media.source_url;
+      stats.imagesDownloaded++;
+      console.log(`  Mapped media ${mediaId}: ${media.source_url}`);
     }
     console.log("");
 
@@ -292,20 +287,12 @@ async function main(): Promise<void> {
         );
       }
 
-      // Download product images
-      console.log("\n  Downloading product images...");
+      // Use original WP image URLs for products (no download needed)
       const productImageMap: Record<string, string> = {};
-
       for (const product of wcProducts) {
         for (const img of product.images) {
-          if (img.src && !productImageMap[img.src]) {
-            const localPath = await downloadImage(img.src, MEDIA_OUTPUT_DIR);
-            if (localPath) {
-              productImageMap[img.src] = path.relative(process.cwd(), localPath);
-              stats.imagesDownloaded++;
-            } else {
-              stats.imageErrors++;
-            }
+          if (img.src) {
+            productImageMap[img.src] = img.src;
           }
         }
       }

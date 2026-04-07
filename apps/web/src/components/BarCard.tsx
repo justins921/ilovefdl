@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Beer, Clock } from 'lucide-react';
 import type { Bar } from '@ilovefdl/shared';
 
@@ -15,10 +16,12 @@ export default function BarCard({ bar }: BarCardProps) {
       {/* Photo */}
       <div className="aspect-[16/10] bg-light relative overflow-hidden">
         {imageUrl ? (
-          <img
+          <Image
             src={imageUrl}
             alt={bar.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-teal/10">
