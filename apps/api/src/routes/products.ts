@@ -229,11 +229,24 @@ router.put('/:id', requireAuth, async (req: Request, res: Response) => {
       }
     }
 
-    const { metadata: updateMetadata, ...updateRest } = parsed.data;
+    const { metadata: updateMetadata, vendorId: newVendorId, ...updateRest } = parsed.data;
+
+    // Only admins can reassign products to a different vendor
+    const vendorUpdate: Record<string, string> = {};
+    if (newVendorId && req.user!.role === 'ADMIN') {
+      const targetVendor = await prisma.vendor.findUnique({ where: { id: newVendorId } });
+      if (!targetVendor) {
+        res.status(404).json({ error: 'Target vendor not found' });
+        return;
+      }
+      vendorUpdate.vendorId = newVendorId;
+    }
+
     const updated = await prisma.product.update({
       where: { id: req.params.id },
       data: {
         ...updateRest,
+        ...vendorUpdate,
         ...(updateMetadata !== undefined && { metadata: toJsonOrDbNull(updateMetadata) }),
       },
     });
