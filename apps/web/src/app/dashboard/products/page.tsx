@@ -209,7 +209,7 @@ export default function ProductsPage() {
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
 
-    const payload: Record<string, unknown> = {
+    const payload = {
       name,
       slug,
       price,
@@ -220,12 +220,9 @@ export default function ProductsPage() {
       inventory,
       isActive: form.isActive,
       externalPlatform: ExternalPlatform.NATIVE,
+      // Admins can reassign the product to a different vendor
+      ...(isAdmin && form.vendorId ? { vendorId: form.vendorId } : {}),
     };
-
-    // Admins can reassign the product to a different vendor
-    if (isAdmin && form.vendorId) {
-      payload.vendorId = form.vendorId;
-    }
 
     setSaving(true);
 
@@ -393,9 +390,9 @@ export default function ProductsPage() {
                             <p className="text-sm font-semibold text-primary truncate">
                               {product.name}
                             </p>
-                            {isAdmin && (product as Record<string, unknown>).vendor && (
+                            {isAdmin && product.vendor && (
                               <p className="text-xs text-teal truncate mt-0.5">
-                                {((product as Record<string, unknown>).vendor as Record<string, string>).businessName}
+                                {product.vendor.businessName}
                               </p>
                             )}
                             {product.categoryTags.length > 0 && (
