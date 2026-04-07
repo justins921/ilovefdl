@@ -692,6 +692,16 @@ export class ApiClient {
     return this.get<PaginatedResponse<User>>('/admin/users', params as Record<string, string | number | boolean | undefined>);
   }
 
+  /** Admin: list all bars */
+  async adminGetBars(params?: { status?: string }): Promise<ApiResponse<Bar[]>> {
+    return this.get<ApiResponse<Bar[]>>('/admin/bars', params as Record<string, string | number | boolean | undefined>);
+  }
+
+  /** Admin: approve or deny a bar application */
+  async adminApproveBar(id: string, approved: boolean): Promise<ApiResponse<{ id: string; approved: boolean }>> {
+    return this.put<ApiResponse<{ id: string; approved: boolean }>>(`/admin/bars/${id}/approve`, { approved });
+  }
+
   // ─── ABANDONED CARTS ──────────────────────────────────
 
   /** Save an abandoned cart */

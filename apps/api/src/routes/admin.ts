@@ -65,6 +65,98 @@ router.put('/vendors/:id/status', requireAuth, requireRole(['ADMIN']), async (re
   }
 });
 
+// GET /admin/bars — list all bars with owner info
+router.get('/bars', requireAuth, requireRole(['ADMIN']), async (req: Request, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const where: Record<string, unknown> = {};
+    if (status === 'pending') where.isActive = false;
+    else if (status === 'approved') where.isActive = true;
+
+    const bars = await prisma.bar.findMany({
+      where,
+      include: {
+        specials: { select: { id: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Attach owner info for bars that have an ownerId
+    const ownerIds = bars.map((b) => b.ownerId).filter(Boolean) as string[];
+    const owners = ownerIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: ownerIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const ownerMap = new Map(owners.map((o) => [o.id, o]));
+
+    const enriched = bars.map((bar) => ({
+      ...bar,
+      owner: bar.ownerId ? ownerMap.get(bar.ownerId) || null : null,
+      specialCount: bar.specials.length,
+    }));
+
+    res.json({ data: enriched });
+  } catch (error) {
+    console.error('Admin list bars error:', error);
+    res.status(500).json({ error: 'Failed to fetch bars' });
+  }
+});
+
+// PUT /admin/bars/:id/approve — approve or deny a bar/restaurant application
+router.put('/bars/:id/approve', requireAuth, requireRole(['ADMIN']), async (req: Request, res: Response) => {
+  try {
+    const { approved } = req.body as { approved: boolean };
+    if (typeof approved !== 'boolean') {
+      res.status(400).json({ error: 'approved must be a boolean' });
+      return;
+    }
+
+    const bar = await prisma.bar.findUnique({ where: { id: req.params.id } });
+    if (!bar) {
+      res.status(404).json({ error: 'Bar not found' });
+      return;
+    }
+
+    if (approved) {
+      // Approve: activate bar and grant BAR_OWNER role
+      await prisma.bar.update({
+        where: { id: req.params.id },
+        data: { isActive: true },
+      });
+
+      if (bar.ownerId) {
+        await prisma.user.update({
+          where: { id: bar.ownerId },
+          data: { role: 'BAR_OWNER' },
+        });
+      }
+    } else {
+      // Deny: delete the bar and keep user as USER
+      await prisma.bar.delete({ where: { id: req.params.id } });
+
+      if (bar.ownerId) {
+        // Revert to USER role if they don't own any other active bars
+        const otherBars = await prisma.bar.count({
+          where: { ownerId: bar.ownerId, isActive: true },
+        });
+        if (otherBars === 0) {
+          await prisma.user.update({
+            where: { id: bar.ownerId },
+            data: { role: 'USER' },
+          });
+        }
+      }
+    }
+
+    res.json({ data: { id: req.params.id, approved } });
+  } catch (error) {
+    console.error('Approve bar error:', error);
+    res.status(500).json({ error: 'Failed to process bar application' });
+  }
+});
+
 // GET /admin/orders — list all orders with filters
 router.get('/orders', requireAuth, requireRole(['ADMIN']), async (req: Request, res: Response) => {
   try {

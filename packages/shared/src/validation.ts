@@ -14,10 +14,11 @@ export {
   loginSchema,
   registerSchema,
   registerVendorSchema,
+  registerBarOwnerSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
 } from './schemas/auth';
-export type { LoginInput, RegisterInput, RegisterVendorInput, ForgotPasswordInput, ResetPasswordInput } from './schemas/auth';
+export type { LoginInput, RegisterInput, RegisterVendorInput, RegisterBarOwnerInput, ForgotPasswordInput, ResetPasswordInput } from './schemas/auth';
 
 // Vendor
 export { createVendorSchema, updateVendorSchema } from './schemas/vendor';
