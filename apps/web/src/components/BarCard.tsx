@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Beer, Clock } from 'lucide-react';
+import { resolveImageUrl } from '@/lib/utils';
 import type { Bar } from '@ilovefdl/shared';
 
 interface BarCardProps {
@@ -17,7 +18,7 @@ export default function BarCard({ bar }: BarCardProps) {
       <div className="aspect-[16/10] bg-light relative overflow-hidden">
         {imageUrl ? (
           <Image
-            src={imageUrl}
+            src={resolveImageUrl(imageUrl)}
             alt={bar.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

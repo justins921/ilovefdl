@@ -13,7 +13,6 @@
  *   DATABASE_URL  — Postgres connection string (required)
  */
 
-import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import {
   fetchAllPosts,
@@ -28,14 +27,12 @@ import {
   type WcProduct,
 } from "./wp-client.js";
 import { mapWpPostToBlogPost, mapWcProductToProduct, stripHtmlTags, generateSlug } from "./mappers.js";
-import { downloadImage } from "./media.js";
+import { uploadImageToApi } from "./api-upload.js";
 
 // ─── configuration ───────────────────────────────────────
 
-const MEDIA_OUTPUT_DIR = path.resolve(
-  process.cwd(),
-  "migrated-media",
-);
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+const MIGRATION_API_KEY = process.env.MIGRATION_API_KEY || "";
 
 // ─── stats ───────────────────────────────────────────────
 
@@ -81,6 +78,15 @@ async function main(): Promise<void> {
     console.error("Create a .env file (see .env.example) and try again.");
     process.exit(1);
   }
+
+  if (!MIGRATION_API_KEY) {
+    console.error("ERROR: MIGRATION_API_KEY environment variable is not set.");
+    console.error("Set it to match the MIGRATION_API_KEY on your API server.");
+    process.exit(1);
+  }
+
+  console.log(`API server: ${API_BASE_URL}`);
+  console.log(`Migration key: ${MIGRATION_API_KEY.slice(0, 4)}...\n`);
 
   const prisma = new PrismaClient();
   const stats: MigrationStats = {
@@ -169,11 +175,11 @@ async function main(): Promise<void> {
     }
     console.log("");
 
-    // ── Step 4: Map featured images to WP source URLs ──────
-    // Use the original WordPress URLs directly so images work
-    // without needing to host downloaded copies on our server.
+    // ── Step 4: Upload featured images to API server ────────
+    // Download from WordPress and re-host on our own API server
+    // so images survive when the WP site is retired.
 
-    console.log("Mapping featured images...");
+    console.log("Uploading featured images to API server...");
     const mediaMap: Record<number, string> = {};
 
     const featuredMediaIds = new Set(
@@ -190,9 +196,21 @@ async function main(): Promise<void> {
         continue;
       }
 
-      mediaMap[mediaId] = media.source_url;
-      stats.imagesDownloaded++;
-      console.log(`  Mapped media ${mediaId}: ${media.source_url}`);
+      console.log(`  Uploading media ${mediaId}: ${media.source_url}`);
+      const apiPath = await uploadImageToApi(
+        media.source_url,
+        API_BASE_URL,
+        MIGRATION_API_KEY,
+      );
+
+      if (apiPath) {
+        mediaMap[mediaId] = apiPath;
+        stats.imagesDownloaded++;
+        console.log(`    → ${apiPath}`);
+      } else {
+        stats.imageErrors++;
+        console.error(`    Failed to upload media ${mediaId}`);
+      }
     }
     console.log("");
 
@@ -287,12 +305,28 @@ async function main(): Promise<void> {
         );
       }
 
-      // Use original WP image URLs for products (no download needed)
+      // Upload product images to API server
+      console.log("\n  Uploading product images to API server...");
       const productImageMap: Record<string, string> = {};
+      const seenUrls = new Set<string>();
       for (const product of wcProducts) {
         for (const img of product.images) {
-          if (img.src) {
-            productImageMap[img.src] = img.src;
+          if (img.src && !seenUrls.has(img.src)) {
+            seenUrls.add(img.src);
+            console.log(`    Uploading: ${img.src}`);
+            const apiPath = await uploadImageToApi(
+              img.src,
+              API_BASE_URL,
+              MIGRATION_API_KEY,
+            );
+            if (apiPath) {
+              productImageMap[img.src] = apiPath;
+              stats.imagesDownloaded++;
+              console.log(`      → ${apiPath}`);
+            } else {
+              stats.imageErrors++;
+              console.error(`      Failed to upload product image`);
+            }
           }
         }
       }

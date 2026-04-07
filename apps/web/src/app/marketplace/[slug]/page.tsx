@@ -16,7 +16,7 @@ import {
   Shield,
 } from 'lucide-react';
 import api from '@/lib/api';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, resolveImageUrl } from '@/lib/utils';
 import { useCart } from '@/components/CartProvider';
 import ProductReviews from '@/components/ProductReviews';
 import type { Product } from '@ilovefdl/shared';
@@ -123,7 +123,7 @@ export default function ProductDetailPage({
               {images.length > 0 ? (
                 <>
                   <img
-                    src={images[activeImage]}
+                    src={resolveImageUrl(images[activeImage])}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
@@ -175,7 +175,7 @@ export default function ProductDetailPage({
                     }`}
                   >
                     <img
-                      src={img}
+                      src={resolveImageUrl(img)}
                       alt={`${product.name} view ${i + 1}`}
                       className="w-full h-full object-cover"
                     />

@@ -57,3 +57,16 @@ export function slugify(text: string): string {
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+/**
+ * Resolve an image path to a full URL.
+ * API-relative paths (starting with `/uploads/`) are prefixed with the API base URL.
+ * Absolute URLs (http/https) are returned as-is.
+ */
+export function resolveImageUrl(src: string): string {
+  if (src.startsWith('/')) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    return `${apiUrl}${src}`;
+  }
+  return src;
+}

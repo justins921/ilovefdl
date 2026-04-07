@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShoppingBag } from 'lucide-react';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, resolveImageUrl } from '@/lib/utils';
 import type { Product } from '@ilovefdl/shared';
 
 interface ProductCardProps {
@@ -17,7 +17,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="aspect-square bg-light relative overflow-hidden">
         {imageUrl ? (
           <Image
-            src={imageUrl}
+            src={resolveImageUrl(imageUrl)}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
