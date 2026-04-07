@@ -1,8 +1,9 @@
 /**
  * WordPress → I Love FDL content migration
  *
- * Pulls all published blog content from ilovefdl.com via the WP REST API,
- * maps it to the platform's Prisma models, and upserts into the database.
+ * Pulls blog posts and WooCommerce products from ilovefdl.com via the
+ * WP REST API / WC Store API, maps them to Prisma models, and upserts
+ * into the database.
  *
  * Usage:
  *   npm run migrate          (from scripts/migrate-from-wp)
@@ -20,11 +21,13 @@ import {
   fetchAllTags,
   fetchAllMedia,
   fetchAllUsers,
+  fetchAllWcProducts,
   type WpTag,
   type WpMedia,
   type WpUser,
+  type WcProduct,
 } from "./wp-client.js";
-import { mapWpPostToBlogPost, stripHtmlTags } from "./mappers.js";
+import { mapWpPostToBlogPost, mapWcProductToProduct, stripHtmlTags, generateSlug } from "./mappers.js";
 import { downloadImage } from "./media.js";
 
 // ─── configuration ───────────────────────────────────────
@@ -42,6 +45,10 @@ interface MigrationStats {
   postsCreated: number;
   postsUpdated: number;
   postErrors: number;
+  productsCreated: number;
+  productsUpdated: number;
+  productErrors: number;
+  vendorsCreated: number;
   imagesDownloaded: number;
   imageErrors: number;
 }
@@ -55,6 +62,10 @@ function printStats(stats: MigrationStats): void {
   console.log(`  Posts created:      ${stats.postsCreated}`);
   console.log(`  Posts updated:      ${stats.postsUpdated}`);
   console.log(`  Post errors:        ${stats.postErrors}`);
+  console.log(`  Vendors created:    ${stats.vendorsCreated}`);
+  console.log(`  Products created:   ${stats.productsCreated}`);
+  console.log(`  Products updated:   ${stats.productsUpdated}`);
+  console.log(`  Product errors:     ${stats.productErrors}`);
   console.log(`  Images downloaded:  ${stats.imagesDownloaded}`);
   console.log(`  Image errors:       ${stats.imageErrors}`);
   console.log("========================================\n");
@@ -78,6 +89,10 @@ async function main(): Promise<void> {
     postsCreated: 0,
     postsUpdated: 0,
     postErrors: 0,
+    productsCreated: 0,
+    productsUpdated: 0,
+    productErrors: 0,
+    vendorsCreated: 0,
     imagesDownloaded: 0,
     imageErrors: 0,
   };
@@ -85,25 +100,29 @@ async function main(): Promise<void> {
   try {
     // ── Step 1: Fetch all WP data ──────────────────────────
 
-    console.log("[1/5] Fetching WordPress categories...");
+    console.log("[1/6] Fetching WordPress categories...");
     const wpCategories = await fetchAllCategories();
     console.log(`  Found ${wpCategories.length} categories.\n`);
 
-    console.log("[2/5] Fetching WordPress tags...");
+    console.log("[2/6] Fetching WordPress tags...");
     const wpTags = await fetchAllTags();
     console.log(`  Found ${wpTags.length} tags.\n`);
 
-    console.log("[3/5] Fetching WordPress users...");
+    console.log("[3/6] Fetching WordPress users...");
     const wpUsers = await fetchAllUsers();
     console.log(`  Found ${wpUsers.length} users.\n`);
 
-    console.log("[4/5] Fetching WordPress media...");
+    console.log("[4/6] Fetching WordPress media...");
     const wpMedia = await fetchAllMedia();
     console.log(`  Found ${wpMedia.length} media items.\n`);
 
-    console.log("[5/5] Fetching WordPress posts...");
+    console.log("[5/6] Fetching WordPress posts...");
     const wpPosts = await fetchAllPosts();
     console.log(`  Found ${wpPosts.length} posts.\n`);
+
+    console.log("[6/6] Fetching WooCommerce products...");
+    const wcProducts = await fetchAllWcProducts();
+    console.log(`  Found ${wcProducts.length} products.\n`);
 
     // ── Step 2: Build lookup maps ──────────────────────────
 
@@ -223,16 +242,138 @@ async function main(): Promise<void> {
       }
     }
 
+    // ── Step 6: Migrate WooCommerce products ────────────────
+
+    if (wcProducts.length > 0) {
+      console.log("\nMigrating WooCommerce products...");
+
+      // Create a shared vendor account for WP-imported products
+      // (we use a deterministic email so re-runs find the same vendor)
+      const wpVendorEmail = "wp-store@ilovefdl.com";
+      let wpVendor = await prisma.vendor.findFirst({
+        where: { user: { email: wpVendorEmail } },
+      });
+
+      if (!wpVendor) {
+        // Create user + vendor for WP store products
+        let wpStoreUser = await prisma.user.findUnique({
+          where: { email: wpVendorEmail },
+        });
+        if (!wpStoreUser) {
+          wpStoreUser = await prisma.user.create({
+            data: {
+              email: wpVendorEmail,
+              name: "I Love FDL Store",
+              role: "VENDOR",
+            },
+          });
+        }
+
+        wpVendor = await prisma.vendor.create({
+          data: {
+            userId: wpStoreUser.id,
+            businessName: "I Love FDL Marketplace",
+            slug: "ilovefdl-marketplace",
+            description:
+              "Official I Love Fond du Lac marketplace — featuring products from local FDL vendors and artisans.",
+            status: "APPROVED",
+            seoTitle: "I Love FDL Marketplace",
+            seoDescription:
+              "Shop local products from Fond du Lac businesses and artisans.",
+          },
+        });
+        stats.vendorsCreated++;
+        console.log(
+          `  Created vendor: ${wpVendor.businessName} (${wpVendor.id})`,
+        );
+      } else {
+        console.log(
+          `  Using existing vendor: ${wpVendor.businessName} (${wpVendor.id})`,
+        );
+      }
+
+      // Download product images
+      console.log("\n  Downloading product images...");
+      const productImageMap: Record<string, string> = {};
+
+      for (const product of wcProducts) {
+        for (const img of product.images) {
+          if (img.src && !productImageMap[img.src]) {
+            const localPath = await downloadImage(img.src, MEDIA_OUTPUT_DIR);
+            if (localPath) {
+              productImageMap[img.src] = path.relative(process.cwd(), localPath);
+              stats.imagesDownloaded++;
+            } else {
+              stats.imageErrors++;
+            }
+          }
+        }
+      }
+
+      // Upsert products
+      console.log("\n  Importing products...");
+      for (const wcProduct of wcProducts) {
+        try {
+          // Skip placeholder/test products
+          if (
+            wcProduct.name.toLowerCase().includes("my product") ||
+            wcProduct.name.toLowerCase() === "test"
+          ) {
+            console.log(`  Skipped test product: ${wcProduct.name}`);
+            continue;
+          }
+
+          const data = mapWcProductToProduct(
+            wcProduct,
+            wpVendor.id,
+            productImageMap,
+          );
+
+          // Check if product already exists by externalId
+          const existing = await prisma.product.findFirst({
+            where: { externalId: `wc-${wcProduct.id}` },
+          });
+
+          if (existing) {
+            await prisma.product.update({
+              where: { id: existing.id },
+              data,
+            });
+            stats.productsUpdated++;
+            console.log(`  Updated: [${wcProduct.id}] ${wcProduct.name}`);
+          } else {
+            // Ensure slug uniqueness
+            const slugTaken = await prisma.product.findUnique({
+              where: { slug: data.slug },
+            });
+            if (slugTaken) {
+              data.slug = `${data.slug}-wc${wcProduct.id}`;
+            }
+
+            await prisma.product.create({ data });
+            stats.productsCreated++;
+            console.log(`  Created: [${wcProduct.id}] ${wcProduct.name}`);
+          }
+        } catch (error) {
+          stats.productErrors++;
+          console.error(
+            `  ERROR migrating product ${wcProduct.id}: ${(error as Error).message}`,
+          );
+        }
+      }
+    }
+
     // ── Done ───────────────────────────────────────────────
 
     printStats(stats);
 
-    if (stats.postErrors > 0) {
+    const totalErrors = stats.postErrors + stats.productErrors;
+    if (totalErrors > 0) {
       console.log(
-        "Some posts failed to migrate. Review the errors above and re-run — the script is idempotent.\n",
+        "Some items failed to migrate. Review the errors above and re-run — the script is idempotent.\n",
       );
     } else {
-      console.log("All posts migrated successfully.\n");
+      console.log("All content migrated successfully.\n");
     }
   } finally {
     await prisma.$disconnect();

@@ -27,6 +27,7 @@ interface ProductFormData {
   inventory: string;
   images: string[];
   isActive: boolean;
+  vendorId: string;
 }
 
 const emptyForm: ProductFormData = {
@@ -38,15 +39,18 @@ const emptyForm: ProductFormData = {
   inventory: '0',
   images: [''],
   isActive: true,
+  vendorId: '',
 };
 
 export default function ProductsPage() {
   const { user } = useAuth();
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [allVendors, setAllVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isAdmin = user?.role === 'ADMIN';
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -67,15 +71,24 @@ export default function ProductsPage() {
       }
 
       const vendorsRes = await api.getVendors({ limit: 100 });
-      const myVendor = vendorsRes.data.find((v) => v.userId === user.id);
 
-      if (myVendor) {
+      if (user.role === 'ADMIN') {
+        // Admins see all products and can reassign to any vendor
+        setAllVendors(vendorsRes.data);
+        const myVendor = vendorsRes.data[0] ?? null;
         setVendor(myVendor);
-        const productsRes = await api.getProducts({
-          vendorId: myVendor.id,
-          limit: 100,
-        });
+        const productsRes = await api.getProducts({ limit: 100 });
         setProducts(productsRes.data);
+      } else {
+        const myVendor = vendorsRes.data.find((v) => v.userId === user.id);
+        if (myVendor) {
+          setVendor(myVendor);
+          const productsRes = await api.getProducts({
+            vendorId: myVendor.id,
+            limit: 100,
+          });
+          setProducts(productsRes.data);
+        }
       }
     } catch {
       setError('Failed to load products.');
@@ -111,6 +124,7 @@ export default function ProductsPage() {
       images:
         product.images.length > 0 ? [...product.images] : [''],
       isActive: product.isActive,
+      vendorId: product.vendorId,
     });
     setFormError(null);
     setModalOpen(true);
@@ -206,6 +220,8 @@ export default function ProductsPage() {
       inventory,
       isActive: form.isActive,
       externalPlatform: ExternalPlatform.NATIVE,
+      // Admins can reassign the product to a different vendor
+      ...(isAdmin && form.vendorId ? { vendorId: form.vendorId } : {}),
     };
 
     setSaving(true);
@@ -374,6 +390,11 @@ export default function ProductsPage() {
                             <p className="text-sm font-semibold text-primary truncate">
                               {product.name}
                             </p>
+                            {isAdmin && product.vendor && (
+                              <p className="text-xs text-teal truncate mt-0.5">
+                                {product.vendor.businessName}
+                              </p>
+                            )}
                             {product.categoryTags.length > 0 && (
                               <p className="text-xs text-primary/50 truncate mt-0.5">
                                 {product.categoryTags.join(', ')}
@@ -539,6 +560,30 @@ export default function ProductsPage() {
                   </p>
                 )}
               </div>
+
+              {/* Vendor Assignment (admin only) */}
+              {isAdmin && allVendors.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1.5">
+                    Assign to Vendor
+                  </label>
+                  <select
+                    value={form.vendorId}
+                    onChange={(e) => updateField('vendorId', e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Select a vendor...</option>
+                    {allVendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.businessName}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-primary/40 mt-1">
+                    Move this product to a different vendor&apos;s store.
+                  </p>
+                </div>
+              )}
 
               {/* Price + Compare At Price */}
               <div className="grid grid-cols-2 gap-4">

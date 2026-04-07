@@ -45,7 +45,9 @@ export const createProductSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
-export const updateProductSchema = createProductSchema.partial();
+export const updateProductSchema = createProductSchema.partial().extend({
+  vendorId: z.string().optional(),
+});
 
 export const productQuerySchema = z.object({
   vendorId: z.string().optional(),

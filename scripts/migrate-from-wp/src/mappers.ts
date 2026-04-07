@@ -4,7 +4,7 @@
  */
 
 import type { PostCategory, PostStatus, Prisma } from "@prisma/client";
-import type { WpPost, WpMedia } from "./wp-client.js";
+import type { WpPost, WpMedia, WcProduct } from "./wp-client.js";
 
 // ─── WordPress category ID → PostCategory enum ─────────
 
@@ -188,5 +188,66 @@ export function mapWpPostToBlogPost(
     seoTitle: stripHtmlTags(wpPost.title.rendered),
     seoDescription: stripHtmlTags(wpPost.excerpt.rendered).slice(0, 160) || null,
     wpOriginalId: wpPost.id,
+  };
+}
+
+// ─── Product mapper ─────────────────────────────────────
+
+/**
+ * Convert a WooCommerce Store API product into a Prisma Product create payload.
+ */
+export function mapWcProductToProduct(
+  wcProduct: WcProduct,
+  vendorId: string,
+  imageMap: Record<string, string>,
+): Prisma.ProductUncheckedCreateInput {
+  // WC Store API prices are in minor units (cents)
+  const minorUnit = wcProduct.prices.currency_minor_unit || 2;
+  const divisor = Math.pow(10, minorUnit);
+  const price = parseInt(wcProduct.prices.price, 10) / divisor;
+  const regularPrice = parseInt(wcProduct.prices.regular_price, 10) / divisor;
+  const salePrice = wcProduct.prices.sale_price
+    ? parseInt(wcProduct.prices.sale_price, 10) / divisor
+    : null;
+
+  // Use sale price as current price if available
+  const currentPrice = salePrice && salePrice > 0 ? salePrice : price;
+  const compareAtPrice = salePrice && salePrice > 0 && regularPrice > salePrice ? regularPrice : null;
+
+  // Map images — use downloaded local paths if available, otherwise original URLs
+  const images: string[] = wcProduct.images
+    .map((img) => imageMap[img.src] || img.src)
+    .filter(Boolean);
+
+  // Collect category + tag strings
+  const categoryTags: string[] = [
+    ...wcProduct.categories.map((c) => c.name),
+    ...wcProduct.tags.map((t) => t.name),
+  ];
+
+  const slug = wcProduct.slug || generateSlug(wcProduct.name);
+
+  return {
+    vendorId,
+    name: stripHtmlTags(wcProduct.name),
+    slug,
+    description: wcProduct.description
+      ? extractPlainText(wcProduct.description)
+      : wcProduct.short_description
+        ? extractPlainText(wcProduct.short_description)
+        : null,
+    price: currentPrice || 0,
+    compareAtPrice,
+    sku: wcProduct.sku || null,
+    images,
+    categoryTags,
+    inventory: wcProduct.stock_quantity ?? 0,
+    isActive: wcProduct.stock_status !== "outofstock",
+    externalPlatform: "NATIVE",
+    externalId: `wc-${wcProduct.id}`,
+    seoTitle: stripHtmlTags(wcProduct.name),
+    seoDescription: wcProduct.short_description
+      ? extractPlainText(wcProduct.short_description).slice(0, 160)
+      : null,
   };
 }
