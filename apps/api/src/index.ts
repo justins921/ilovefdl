@@ -34,6 +34,7 @@ import campaignRoutes from './routes/campaigns';
 import currencyRoutes from './routes/currency';
 import shippingRateRoutes from './routes/shipping-rates';
 import uploadRoutes from './routes/uploads';
+import webhookRoutes from './routes/webhooks';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -49,13 +50,14 @@ app.use(
   })
 );
 
-// ─── Stripe webhook route (must be before JSON parsing) ──
-// Raw body is required for Stripe webhook signature verification
+// ─── Webhook routes (must be before JSON parsing for signature verification) ──
 app.post(
   '/webhooks/stripe',
   express.raw({ type: 'application/json' }),
   orderRoutes
 );
+// Square & Shopify webhooks use JSON parsing (signatures verified in handler)
+app.use('/webhooks', express.json(), webhookRoutes);
 
 // ─── Body parsing ────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -145,9 +147,15 @@ app.use(
 );
 
 // ─── Start server ────────────────────────────────────────
+import prisma from './utils/prisma';
+import { startInventorySyncJob } from './jobs/sync-inventory';
+
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`API server running on 0.0.0.0:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Start background inventory sync (pulls from Square/Shopify every 15 min)
+  startInventorySyncJob(prisma);
 });
 
 export default app;
