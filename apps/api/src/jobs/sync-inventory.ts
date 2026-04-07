@@ -53,7 +53,7 @@ export async function runInventorySync(prisma: PrismaClient): Promise<void> {
 
     for (const connection of connections) {
       try {
-        const adapter = getAdapter(connection.platform);
+        const adapter = getAdapter(connection.platform as unknown as ExternalPlatform);
 
         // Pull remote inventory
         const remoteInventory = await adapter.fetchInventory(
