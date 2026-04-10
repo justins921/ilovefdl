@@ -42,6 +42,7 @@ import type {
 } from './types';
 import type {
   RegisterVendorInput,
+  RegisterBarOwnerInput,
   CreateVendorInput,
   UpdateVendorInput,
   CreateProductInput,
@@ -222,6 +223,11 @@ export class ApiClient {
   /** Register as a vendor (creates account + vendor profile) */
   async registerVendor(data: RegisterVendorInput): Promise<ApiResponse<LoginResponse>> {
     return this.post<ApiResponse<LoginResponse>>('/auth/register-vendor', data);
+  }
+
+  /** Register as a bar/restaurant owner (creates account + bar listing) */
+  async registerBarOwner(data: RegisterBarOwnerInput): Promise<ApiResponse<LoginResponse>> {
+    return this.post<ApiResponse<LoginResponse>>('/auth/register-bar-owner', data);
   }
 
   /** Get the current authenticated user */

@@ -11,7 +11,7 @@ import {
   ArrowLeft,
   Heart,
   Loader2,
-  Store,
+  Beer,
   Globe,
   Phone,
   MapPin,
@@ -21,7 +21,7 @@ import {
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 
-export default function VendorRegisterPage() {
+export default function BarOwnerRegisterPage() {
   const router = useRouter();
   const { login } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
@@ -31,12 +31,12 @@ export default function VendorRegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Business fields
-  const [businessName, setBusinessName] = useState('');
+  // Bar fields
+  const [barName, setBarName] = useState('');
   const [slug, setSlug] = useState('');
+  const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
   const [website, setWebsite] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -51,10 +51,9 @@ export default function VendorRegisterPage() {
       .replace(/^-|-$/g, '');
   };
 
-  const handleBusinessNameChange = (value: string) => {
-    setBusinessName(value);
-    // Auto-generate slug if user hasn't manually edited it
-    if (!slug || slug === generateSlug(businessName)) {
+  const handleBarNameChange = (value: string) => {
+    setBarName(value);
+    if (!slug || slug === generateSlug(barName)) {
       setSlug(generateSlug(value));
     }
   };
@@ -71,24 +70,23 @@ export default function VendorRegisterPage() {
     setLoading(true);
 
     try {
-      const res = await api.registerVendor({
+      const res = await api.registerBarOwner({
         email,
         password,
         name,
-        businessName,
+        barName,
         slug,
+        address,
         description: description || undefined,
         phone: phone || undefined,
-        address: address || undefined,
         website: website || undefined,
       });
 
       const { token, user } = res.data;
       login(token, user);
-      router.push('/dashboard');
+      router.push('/');
     } catch (err: any) {
       setError(err?.message || 'Something went wrong. Please try again.');
-      // If the error is about email/account, go back to step 1
       if (err?.message?.toLowerCase().includes('email')) {
         setStep(1);
       }
@@ -98,7 +96,7 @@ export default function VendorRegisterPage() {
   };
 
   const accountFieldsValid = name && email && password.length >= 8;
-  const businessFieldsValid = businessName.length >= 2 && slug.length >= 2;
+  const barFieldsValid = barName.length >= 2 && slug.length >= 2 && address.length >= 5;
 
   return (
     <div className="min-h-screen bg-light flex items-center justify-center">
@@ -114,12 +112,12 @@ export default function VendorRegisterPage() {
               </span>
             </Link>
             <h1 className="text-xl font-bold text-primary mb-1">
-              Become a Vendor
+              List Your Bar or Restaurant
             </h1>
             <p className="text-primary/60 text-sm">
               {step === 1
                 ? 'Create your account to get started'
-                : 'Tell us about your business'}
+                : 'Tell us about your establishment'}
             </p>
           </div>
 
@@ -211,19 +209,19 @@ export default function VendorRegisterPage() {
             </form>
           ) : (
             <form onSubmit={handleSubmit}>
-              {/* Business Name */}
+              {/* Bar Name */}
               <div className="mb-4">
-                <label htmlFor="businessName" className="block text-sm font-medium text-primary mb-2">
-                  Business Name
+                <label htmlFor="barName" className="block text-sm font-medium text-primary mb-2">
+                  Bar / Restaurant Name
                 </label>
                 <div className="relative">
-                  <Store className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
+                  <Beer className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
                   <input
-                    id="businessName"
+                    id="barName"
                     type="text"
-                    value={businessName}
-                    onChange={(e) => handleBusinessNameChange(e.target.value)}
-                    placeholder="Your business name"
+                    value={barName}
+                    onChange={(e) => handleBarNameChange(e.target.value)}
+                    placeholder="Your establishment name"
                     className="input-field pl-12"
                     required
                     minLength={2}
@@ -232,10 +230,10 @@ export default function VendorRegisterPage() {
                 </div>
               </div>
 
-              {/* Store URL / Slug */}
+              {/* Listing URL / Slug */}
               <div className="mb-4">
                 <label htmlFor="slug" className="block text-sm font-medium text-primary mb-2">
-                  Store URL
+                  Listing URL
                 </label>
                 <div className="relative">
                   <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
@@ -244,7 +242,7 @@ export default function VendorRegisterPage() {
                     type="text"
                     value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    placeholder="my-store"
+                    placeholder="my-bar"
                     className="input-field pl-12"
                     required
                     minLength={2}
@@ -252,9 +250,29 @@ export default function VendorRegisterPage() {
                 </div>
                 {slug && (
                   <p className="text-xs text-primary/50 mt-1">
-                    ilovefdl.com/vendors/{slug}
+                    ilovefdl.com/bars/{slug}
                   </p>
                 )}
+              </div>
+
+              {/* Address (required) */}
+              <div className="mb-4">
+                <label htmlFor="address" className="block text-sm font-medium text-primary mb-2">
+                  Address
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
+                  <input
+                    id="address"
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="123 Main St, Fond du Lac, WI"
+                    className="input-field pl-12"
+                    required
+                    minLength={5}
+                  />
+                </div>
               </div>
 
               {/* Description */}
@@ -268,7 +286,7 @@ export default function VendorRegisterPage() {
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Tell customers about your business"
+                    placeholder="Tell people about your bar or restaurant"
                     className="input-field pl-12 min-h-[80px] resize-none"
                     rows={3}
                     maxLength={2000}
@@ -289,24 +307,6 @@ export default function VendorRegisterPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(555) 123-4567"
-                    className="input-field pl-12"
-                  />
-                </div>
-              </div>
-
-              {/* Address */}
-              <div className="mb-4">
-                <label htmlFor="address" className="block text-sm font-medium text-primary mb-2">
-                  Address <span className="text-primary/40">(optional)</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
-                  <input
-                    id="address"
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="123 Main St, Fond du Lac, WI"
                     className="input-field pl-12"
                   />
                 </div>
@@ -346,14 +346,14 @@ export default function VendorRegisterPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !businessFieldsValid}
+                  disabled={loading || !barFieldsValid}
                   className="flex-1 btn-primary py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <>
-                      Create Vendor Account
+                      Submit Application
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </>
                   )}
@@ -362,19 +362,19 @@ export default function VendorRegisterPage() {
             </form>
           )}
 
-          {/* Links to other registration types */}
+          {/* Link to other registration types */}
           <div className="mt-6 text-center space-y-2">
             <p className="text-sm text-primary/60">
-              Own a bar or restaurant?{' '}
+              Want to sell products?{' '}
               <Link
-                href="/auth/bar-owner"
+                href="/auth/vendor"
                 className="text-teal hover:text-teal/80 font-medium transition-colors"
               >
-                List your establishment
+                Register as a vendor
               </Link>
             </p>
             <p className="text-sm text-primary/60">
-              Just want to shop?{' '}
+              Just browsing?{' '}
               <Link
                 href="/auth"
                 className="text-teal hover:text-teal/80 font-medium transition-colors"
@@ -386,7 +386,7 @@ export default function VendorRegisterPage() {
         </div>
 
         <p className="text-center text-xs text-primary/40 mt-6">
-          By registering, you agree to our Terms of Service and Privacy Policy.
+          Your listing will be reviewed by an admin before going live.
         </p>
       </div>
     </div>
