@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ilovefdl/shared": "*",
+    "@tailwindcss/typography": "^0.5.19",
     "autoprefixer": "^10.4.20",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.460.0",

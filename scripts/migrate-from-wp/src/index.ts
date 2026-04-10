@@ -21,10 +21,13 @@ import {
   fetchAllMedia,
   fetchAllUsers,
   fetchAllWcProducts,
+  fetchAllDokanStores,
+  fetchDokanStoreProductIds,
   type WpTag,
   type WpMedia,
   type WpUser,
   type WcProduct,
+  type DokanStore,
 } from "./wp-client.js";
 import { mapWpPostToBlogPost, mapWcProductToProduct, stripHtmlTags, generateSlug } from "./mappers.js";
 import { uploadImageToApi } from "./api-upload.js";
@@ -126,9 +129,13 @@ async function main(): Promise<void> {
     const wpPosts = await fetchAllPosts();
     console.log(`  Found ${wpPosts.length} posts.\n`);
 
-    console.log("[6/6] Fetching WooCommerce products...");
+    console.log("[6/7] Fetching WooCommerce products...");
     const wcProducts = await fetchAllWcProducts();
     console.log(`  Found ${wcProducts.length} products.\n`);
+
+    console.log("[7/7] Fetching Dokan vendor stores...");
+    const dokanStores = await fetchAllDokanStores();
+    console.log(`  Found ${dokanStores.length} Dokan stores.\n`);
 
     // ── Step 2: Build lookup maps ──────────────────────────
 
@@ -260,15 +267,88 @@ async function main(): Promise<void> {
     if (wcProducts.length > 0) {
       console.log("\nMigrating WooCommerce products...");
 
-      // Create a shared vendor account for WP-imported products
-      // (we use a deterministic email so re-runs find the same vendor)
+      // ── Create vendors from Dokan stores ─────────────────
+
+      // Map: Dokan store ID → platform Vendor ID
+      const dokanVendorMap: Record<number, string> = {};
+
+      if (dokanStores.length > 0) {
+        console.log("\n  Creating vendors from Dokan stores...");
+        for (const store of dokanStores) {
+          if (!store.store_name || !store.enabled) {
+            console.log(`    Skipped disabled store: ${store.store_name || store.id}`);
+            continue;
+          }
+
+          const email = store.email || `dokan-${store.id}@ilovefdl.com`;
+          const slug = store.store_name
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, "")
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "") || `vendor-${store.id}`;
+
+          // Find or create user
+          let user = await prisma.user.findUnique({ where: { email } });
+          if (!user) {
+            user = await prisma.user.create({
+              data: {
+                email,
+                name: store.store_name,
+                role: "VENDOR",
+                avatarUrl: store.gravatar || null,
+              },
+            });
+          }
+
+          // Find or create vendor
+          let vendor = await prisma.vendor.findFirst({
+            where: { userId: user.id },
+          });
+
+          if (!vendor) {
+            // Check slug uniqueness
+            const slugTaken = await prisma.vendor.findUnique({ where: { slug } });
+            const finalSlug = slugTaken ? `${slug}-${store.id}` : slug;
+
+            const addressParts = [
+              store.address?.street_1,
+              store.address?.city,
+              store.address?.state,
+              store.address?.zip,
+            ].filter(Boolean);
+
+            vendor = await prisma.vendor.create({
+              data: {
+                userId: user.id,
+                businessName: store.store_name,
+                slug: finalSlug,
+                phone: store.phone || null,
+                address: addressParts.length > 0 ? addressParts.join(", ") : null,
+                website: store.social?.url || null,
+                logo: store.gravatar || null,
+                banner: store.banner || null,
+                status: "APPROVED",
+                seoTitle: store.store_name,
+              },
+            });
+            stats.vendorsCreated++;
+            console.log(`    Created vendor: ${store.store_name} (${vendor.id})`);
+          } else {
+            console.log(`    Existing vendor: ${store.store_name} (${vendor.id})`);
+          }
+
+          dokanVendorMap[store.id] = vendor.id;
+        }
+      }
+
+      // Fallback vendor for products that can't be matched to a Dokan store
       const wpVendorEmail = "wp-store@ilovefdl.com";
-      let wpVendor = await prisma.vendor.findFirst({
+      let fallbackVendor = await prisma.vendor.findFirst({
         where: { user: { email: wpVendorEmail } },
       });
 
-      if (!wpVendor) {
-        // Create user + vendor for WP store products
+      if (!fallbackVendor) {
         let wpStoreUser = await prisma.user.findUnique({
           where: { email: wpVendorEmail },
         });
@@ -282,7 +362,7 @@ async function main(): Promise<void> {
           });
         }
 
-        wpVendor = await prisma.vendor.create({
+        fallbackVendor = await prisma.vendor.create({
           data: {
             userId: wpStoreUser.id,
             businessName: "I Love FDL Marketplace",
@@ -296,13 +376,27 @@ async function main(): Promise<void> {
           },
         });
         stats.vendorsCreated++;
-        console.log(
-          `  Created vendor: ${wpVendor.businessName} (${wpVendor.id})`,
-        );
-      } else {
-        console.log(
-          `  Using existing vendor: ${wpVendor.businessName} (${wpVendor.id})`,
-        );
+        console.log(`    Created fallback vendor: ${fallbackVendor.businessName}`);
+      }
+
+      // Build WC product ID → vendor ID map from Dokan store products
+      const wcProductVendorMap: Record<number, string> = {};
+      if (dokanStores.length > 0) {
+        console.log("\n  Mapping products to Dokan vendors...");
+        for (const store of dokanStores) {
+          const vendorId = dokanVendorMap[store.id];
+          if (!vendorId) continue;
+
+          try {
+            const productIds = await fetchDokanStoreProductIds(store.id);
+            for (const pid of productIds) {
+              wcProductVendorMap[pid] = vendorId;
+            }
+            console.log(`    ${store.store_name}: ${productIds.length} products`);
+          } catch {
+            console.warn(`    Failed to fetch products for store ${store.store_name}`);
+          }
+        }
       }
 
       // Upload product images to API server
@@ -344,9 +438,12 @@ async function main(): Promise<void> {
             continue;
           }
 
+          // Use Dokan vendor if matched, otherwise fallback
+          const vendorId = wcProductVendorMap[wcProduct.id] || fallbackVendor.id;
+
           const data = mapWcProductToProduct(
             wcProduct,
-            wpVendor.id,
+            vendorId,
             productImageMap,
           );
 
