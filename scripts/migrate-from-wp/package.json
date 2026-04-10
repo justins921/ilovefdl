@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "migrate": "tsx --env-file=.env src/index.ts"
+    "migrate": "tsx --env-file=.env src/index.ts",
+    "fix-images": "tsx --env-file=.env src/fix-images.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
