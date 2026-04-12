@@ -93,15 +93,23 @@ app.use(authMiddleware);
 // ─── Static file serving for uploads ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+// ─── Cache Control for public GET endpoints ─────────────
+const publicCacheControl: express.RequestHandler = (req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  }
+  next();
+};
+
 // ─── API Routes ──────────────────────────────────────────
 app.use('/auth', authRateLimit, authRoutes);
-app.use('/vendors', vendorRoutes);
-app.use('/products', productRoutes);
+app.use('/vendors', publicCacheControl, vendorRoutes);
+app.use('/products', publicCacheControl, productRoutes);
 app.use('/checkout', orderRoutes);
 app.use('/orders', orderRoutes);
-app.use('/posts', blogRoutes);
-app.use('/bars', barRoutes);
-app.use('/specials', specialRoutes);
+app.use('/posts', publicCacheControl, blogRoutes);
+app.use('/bars', publicCacheControl, barRoutes);
+app.use('/specials', publicCacheControl, specialRoutes);
 app.use('/push', notificationRoutes);
 app.use('/integrations', integrationRoutes);
 app.use('/reviews', reviewRoutes);
