@@ -153,18 +153,18 @@ export default function BlogPostPage({
     <div className="min-h-screen bg-light">
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-primary/60 mb-8">
-          <Link href="/news" className="hover:text-teal transition-colors">
+        <nav className="flex items-center gap-2 text-xs sm:text-sm text-primary/60 mb-8 overflow-hidden">
+          <Link href="/news" className="hover:text-teal transition-colors shrink-0">
             News
           </Link>
-          <span>/</span>
+          <span className="shrink-0">/</span>
           <Link
             href={`/news?category=${post.category}`}
-            className="hover:text-teal transition-colors"
+            className="hover:text-teal transition-colors shrink-0"
           >
             {formatCategoryName(post.category)}
           </Link>
-          <span>/</span>
+          <span className="shrink-0">/</span>
           <span className="text-primary truncate">{post.title}</span>
         </nav>
 
@@ -226,7 +226,7 @@ export default function BlogPostPage({
 
         {/* Content */}
         <div
-          className="prose prose-lg max-w-none text-primary/80 leading-relaxed mb-12"
+          className="prose prose-sm sm:prose-lg max-w-none text-primary/80 leading-relaxed mb-12"
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 

@@ -102,7 +102,7 @@ export default function VendorDashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-primary mb-1">
             Dashboard
@@ -113,7 +113,7 @@ export default function VendorDashboardPage() {
         </div>
         <Link
           href={`/vendors/${vendor.slug}`}
-          className="btn-outline text-sm"
+          className="btn-outline text-sm self-start"
         >
           <Store className="w-4 h-4 mr-2" />
           View Storefront
@@ -130,10 +130,10 @@ export default function VendorDashboardPage() {
               </div>
               <TrendingUp className="w-4 h-4 text-teal" />
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary truncate">
               {formatPrice(totalRevenue)}
             </p>
-            <p className="text-sm text-primary/60 mt-1">Total Revenue</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Total Revenue</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -142,8 +142,8 @@ export default function VendorDashboardPage() {
                 <ShoppingCart className="w-5 h-5 text-accent" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">{orders.length}</p>
-            <p className="text-sm text-primary/60 mt-1">Orders</p>
+            <p className="text-xl sm:text-2xl font-bold text-primary">{orders.length}</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Orders</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -152,10 +152,10 @@ export default function VendorDashboardPage() {
                 <ShoppingBag className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary">
               {products.length}
             </p>
-            <p className="text-sm text-primary/60 mt-1">Products</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Products</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -164,10 +164,10 @@ export default function VendorDashboardPage() {
                 <BarChart3 className="w-5 h-5 text-teal" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary">
               {(vendor.commissionRate * 100).toFixed(0)}%
             </p>
-            <p className="text-sm text-primary/60 mt-1">Commission Rate</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Commission Rate</p>
           </div>
         </div>
 
@@ -187,17 +187,17 @@ export default function VendorDashboardPage() {
                   {orders.map((order) => (
                     <div
                       key={order.id}
-                      className="px-6 py-4 flex items-center justify-between hover:bg-light/50 transition-colors"
+                      className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-light/50 transition-colors"
                     >
-                      <div>
-                        <p className="text-sm font-medium text-primary">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">
                           {order.user?.name || order.user?.email || 'Customer'}
                         </p>
                         <p className="text-xs text-primary/50">
                           {formatDate(order.createdAt)} &middot; #{order.id.slice(0, 8)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             statusColors[order.status] || 'bg-gray-100 text-gray-800'

@@ -83,7 +83,7 @@ export default async function HomePage() {
                 Read the News
               </Link>
             </div>
-            <div className="mt-12 flex items-center gap-8 text-white/50 text-sm">
+            <div className="mt-12 flex flex-wrap items-center gap-4 sm:gap-8 text-white/50 text-sm">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
                 <span>Fond du Lac, WI</span>
