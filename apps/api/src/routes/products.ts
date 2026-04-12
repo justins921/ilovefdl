@@ -232,12 +232,25 @@ router.put('/:id', requireAuth, async (req: Request, res: Response) => {
       }
     }
 
+    // Admins can reassign a product to a different vendor via vendorId in the body
+    const bodyVendorId = (req.body as Record<string, unknown>).vendorId as string | undefined;
+    let vendorReassignment: { vendorId: string } | undefined;
+    if (req.user!.role === 'ADMIN' && bodyVendorId && bodyVendorId !== product.vendorId) {
+      const targetVendor = await prisma.vendor.findUnique({ where: { id: bodyVendorId } });
+      if (!targetVendor) {
+        res.status(400).json({ error: 'Target vendor not found' });
+        return;
+      }
+      vendorReassignment = { vendorId: bodyVendorId };
+    }
+
     const { metadata: updateMetadata, ...updateRest } = parsed.data;
     const updated = await prisma.product.update({
       where: { id: req.params.id },
       data: {
         ...updateRest,
         ...(updateMetadata !== undefined && { metadata: toJsonOrDbNull(updateMetadata) }),
+        ...(vendorReassignment ?? {}),
       },
     });
 
