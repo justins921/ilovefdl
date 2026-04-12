@@ -248,7 +248,7 @@ export default function ProductDetailPage({
             <div className="bg-white rounded-xl p-6 border border-light mb-6">
               {product.inventory > 0 ? (
                 <>
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4">
                     <span className="text-sm font-medium text-primary">
                       Quantity
                     </span>
@@ -310,7 +310,7 @@ export default function ProductDetailPage({
             </div>
 
             {/* Trust Badges */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 text-sm text-primary/60">
                 <Truck className="w-5 h-5 text-teal flex-shrink-0" />
                 <span>Local pickup or shipping available</span>

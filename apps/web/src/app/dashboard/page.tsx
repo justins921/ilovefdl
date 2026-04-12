@@ -7,18 +7,11 @@ import {
   ShoppingBag,
   ShoppingCart,
   DollarSign,
-  Plus,
   ArrowRight,
   Package,
   Clock,
   TrendingUp,
   BarChart3,
-  Tag,
-  Truck,
-  MessageSquare,
-  Star,
-  Wallet,
-  Settings,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -109,7 +102,7 @@ export default function VendorDashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-primary mb-1">
             Dashboard
@@ -120,7 +113,7 @@ export default function VendorDashboardPage() {
         </div>
         <Link
           href={`/vendors/${vendor.slug}`}
-          className="btn-outline text-sm"
+          className="btn-outline text-sm self-start"
         >
           <Store className="w-4 h-4 mr-2" />
           View Storefront
@@ -137,10 +130,10 @@ export default function VendorDashboardPage() {
               </div>
               <TrendingUp className="w-4 h-4 text-teal" />
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary truncate">
               {formatPrice(totalRevenue)}
             </p>
-            <p className="text-sm text-primary/60 mt-1">Total Revenue</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Total Revenue</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -149,8 +142,8 @@ export default function VendorDashboardPage() {
                 <ShoppingCart className="w-5 h-5 text-accent" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">{orders.length}</p>
-            <p className="text-sm text-primary/60 mt-1">Orders</p>
+            <p className="text-xl sm:text-2xl font-bold text-primary">{orders.length}</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Orders</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -159,10 +152,10 @@ export default function VendorDashboardPage() {
                 <ShoppingBag className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary">
               {products.length}
             </p>
-            <p className="text-sm text-primary/60 mt-1">Products</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Products</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -171,10 +164,10 @@ export default function VendorDashboardPage() {
                 <BarChart3 className="w-5 h-5 text-teal" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary">
               {(vendor.commissionRate * 100).toFixed(0)}%
             </p>
-            <p className="text-sm text-primary/60 mt-1">Commission Rate</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Commission Rate</p>
           </div>
         </div>
 
@@ -194,17 +187,17 @@ export default function VendorDashboardPage() {
                   {orders.map((order) => (
                     <div
                       key={order.id}
-                      className="px-6 py-4 flex items-center justify-between hover:bg-light/50 transition-colors"
+                      className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-light/50 transition-colors"
                     >
-                      <div>
-                        <p className="text-sm font-medium text-primary">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">
                           {order.user?.name || order.user?.email || 'Customer'}
                         </p>
                         <p className="text-xs text-primary/50">
                           {formatDate(order.createdAt)} &middot; #{order.id.slice(0, 8)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             statusColors[order.status] || 'bg-gray-100 text-gray-800'
@@ -230,147 +223,8 @@ export default function VendorDashboardPage() {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-light p-6">
-              <h3 className="font-bold text-primary mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <Link
-                  href="/dashboard/products"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Plus className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Manage Products
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href={`/vendors/${vendor.slug}`}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Store className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      View Storefront
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/integrations"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <ArrowRight className="w-5 h-5 text-teal rotate-90" />
-                    <span className="text-sm font-medium text-primary">
-                      Integrations
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/orders"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <ShoppingCart className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Orders
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/coupons"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Tag className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Coupons
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/reports"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Reports
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/reviews"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Star className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Reviews
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/withdraw"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Wallet className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Withdraw
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/shipping"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Truck className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Shipping Profiles
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Settings className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Settings
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/messages"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <MessageSquare className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Messages
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Products Summary */}
+          {/* Products Summary */}
+          <div>
             <div className="bg-white rounded-xl border border-light p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-primary">Your Products</h3>

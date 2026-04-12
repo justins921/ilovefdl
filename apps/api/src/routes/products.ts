@@ -149,11 +149,17 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       where: { userId: req.user!.id },
     });
 
-    // Admins can pass vendorId in the body to create products for any vendor
+    // Allow vendorId in the body to assign products to a specific vendor
     const bodyVendorId = (req.body as Record<string, unknown>).vendorId as string | undefined;
     let resolvedVendorId: string;
 
-    if (req.user!.role === 'ADMIN' && bodyVendorId) {
+    if (bodyVendorId) {
+      // Verify the target vendor exists
+      const targetVendor = await prisma.vendor.findUnique({ where: { id: bodyVendorId } });
+      if (!targetVendor) {
+        res.status(404).json({ error: 'Target vendor not found' });
+        return;
+      }
       resolvedVendorId = bodyVendorId;
     } else if (vendor) {
       resolvedVendorId = vendor.id;
@@ -231,9 +237,9 @@ router.put('/:id', requireAuth, async (req: Request, res: Response) => {
 
     const { metadata: updateMetadata, vendorId: newVendorId, ...updateRest } = parsed.data;
 
-    // Only admins can reassign products to a different vendor
+    // Allow reassigning products to a different vendor
     const vendorUpdate: Record<string, string> = {};
-    if (newVendorId && req.user!.role === 'ADMIN') {
+    if (newVendorId) {
       const targetVendor = await prisma.vendor.findUnique({ where: { id: newVendorId } });
       if (!targetVendor) {
         res.status(404).json({ error: 'Target vendor not found' });
