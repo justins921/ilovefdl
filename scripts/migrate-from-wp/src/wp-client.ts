@@ -74,6 +74,36 @@ export interface WpUser {
   avatar_urls: Record<string, string>;
 }
 
+export interface WcProduct {
+  id: number;
+  name: string;
+  slug: string;
+  parent: number;
+  type: string;
+  description: string;
+  short_description: string;
+  sku: string;
+  prices: {
+    price: string;
+    regular_price: string;
+    sale_price: string;
+    currency_code: string;
+    currency_minor_unit: number;
+  };
+  images: Array<{
+    id: number;
+    src: string;
+    thumbnail: string;
+    name: string;
+    alt: string;
+  }>;
+  categories: Array<{ id: number; name: string; slug: string }>;
+  tags: Array<{ id: number; name: string; slug: string }>;
+  stock_status: string;
+  stock_quantity: number | null;
+  permalink: string;
+}
+
 // ─── helpers ─────────────────────────────────────────────
 
 async function sleep(ms: number): Promise<void> {
@@ -163,6 +193,33 @@ async function fetchAllPages<T>(endpoint: string, params: Record<string, string>
   return results;
 }
 
+// ─── Dokan types ────────────────────────────────────────
+
+export interface DokanStore {
+  id: number;
+  store_name: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  address: {
+    street_1?: string;
+    street_2?: string;
+    city?: string;
+    zip?: string;
+    state?: string;
+    country?: string;
+  };
+  shop_url: string;
+  gravatar: string;
+  banner: string;
+  social: Record<string, string>;
+  featured: boolean;
+  rating: { rating: string; count: number };
+  enabled: boolean;
+  registered: string;
+}
+
 // ─── public API ──────────────────────────────────────────
 
 export async function fetchAllPosts(): Promise<WpPost[]> {
@@ -184,6 +241,87 @@ export async function fetchAllMedia(): Promise<WpMedia[]> {
 
 export async function fetchAllUsers(): Promise<WpUser[]> {
   return fetchAllPages<WpUser>("users");
+}
+
+/**
+ * Fetch all Dokan store vendors.
+ * Endpoint: GET /wp-json/dokan/v1/stores
+ */
+export async function fetchAllDokanStores(): Promise<DokanStore[]> {
+  const DOKAN_URL = "https://ilovefdl.com/wp-json/dokan/v1";
+  const results: DokanStore[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${DOKAN_URL}/stores?per_page=${PER_PAGE}&page=${page}`;
+    console.log(`  Fetching Dokan stores page ${page}...`);
+    try {
+      const response = await fetchWithRetry(url);
+      const data = (await response.json()) as DokanStore[];
+      results.push(...data);
+      hasMore = data.length === PER_PAGE;
+      page++;
+    } catch (error) {
+      // Dokan API may require auth or not exist — fail gracefully
+      console.warn(`  Dokan stores fetch failed: ${(error as Error).message}`);
+      hasMore = false;
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Fetch product IDs belonging to a specific Dokan store.
+ * Returns array of WC product IDs.
+ */
+export async function fetchDokanStoreProductIds(
+  storeId: number,
+): Promise<number[]> {
+  const DOKAN_URL = "https://ilovefdl.com/wp-json/dokan/v1";
+  const productIds: number[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${DOKAN_URL}/stores/${storeId}/products?per_page=${PER_PAGE}&page=${page}`;
+    try {
+      const response = await fetchWithRetry(url);
+      const data = (await response.json()) as Array<{ id: number }>;
+      productIds.push(...data.map((p) => p.id));
+      hasMore = data.length === PER_PAGE;
+      page++;
+    } catch {
+      hasMore = false;
+    }
+  }
+
+  return productIds;
+}
+
+/**
+ * Fetch products from the WooCommerce Store API.
+ * This endpoint is public and includes pricing data.
+ */
+export async function fetchAllWcProducts(): Promise<WcProduct[]> {
+  const WC_STORE_URL = "https://ilovefdl.com/wp-json/wc/store/v1";
+  const results: WcProduct[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `${WC_STORE_URL}/products?per_page=${PER_PAGE}&page=${page}`;
+    console.log(`  Fetching WC products page ${page}...`);
+    const response = await fetchWithRetry(url);
+    const data = (await response.json()) as WcProduct[];
+    results.push(...data);
+    // If we got fewer than PER_PAGE, we've fetched everything
+    hasMore = data.length === PER_PAGE;
+    page++;
+  }
+
+  return results;
 }
 
 /**

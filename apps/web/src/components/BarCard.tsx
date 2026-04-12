@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MapPin, Beer, Clock } from 'lucide-react';
+import { resolveImageUrl } from '@/lib/utils';
 import type { Bar } from '@ilovefdl/shared';
 
 interface BarCardProps {
@@ -16,8 +17,9 @@ export default function BarCard({ bar }: BarCardProps) {
       <div className="aspect-[16/10] bg-light relative overflow-hidden">
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={resolveImageUrl(imageUrl)}
             alt={bar.name}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (

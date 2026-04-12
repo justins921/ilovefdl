@@ -8,31 +8,84 @@ const router = Router();
 
 /**
  * GET /vendors
- * List approved vendors (public)
+ * List approved vendors (public) with pagination
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const vendors = await prisma.vendor.findMany({
-      where: { status: 'APPROVED' },
-      select: {
-        id: true,
-        businessName: true,
-        slug: true,
-        description: true,
-        logoUrl: true,
-        bannerUrl: true,
-        status: true,
-        createdAt: true,
-        user: { select: { name: true, avatarUrl: true } },
-        _count: { select: { products: true } },
-      },
-      orderBy: { businessName: 'asc' },
-    });
+    const { page = '1', limit = '20', status } = req.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
 
-    res.json({ data: vendors });
+    // Default to approved for public; admin can filter by status via admin routes
+    const where = status ? { status: status as 'PENDING' | 'APPROVED' | 'SUSPENDED' } : { status: 'APPROVED' as const };
+
+    const [vendors, total] = await Promise.all([
+      prisma.vendor.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          businessName: true,
+          slug: true,
+          description: true,
+          logoUrl: true,
+          bannerUrl: true,
+          address: true,
+          phone: true,
+          website: true,
+          socialLinks: true,
+          status: true,
+          commissionRate: true,
+          stripeOnboarded: true,
+          createdAt: true,
+          updatedAt: true,
+          user: { select: { id: true, name: true, avatarUrl: true } },
+          _count: { select: { products: true, orders: true } },
+        },
+        orderBy: { businessName: 'asc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.vendor.count({ where }),
+    ]);
+
+    res.json({
+      data: vendors,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
     console.error('List vendors error:', error);
     res.status(500).json({ error: 'Failed to fetch vendors' });
+  }
+});
+
+/**
+ * GET /vendors/me
+ * Get the current user's vendor profile (auth required)
+ */
+router.get('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const vendor = await prisma.vendor.findUnique({
+      where: { userId: req.user!.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        _count: { select: { products: true, orders: true } },
+      },
+    });
+
+    if (!vendor) {
+      res.status(404).json({ error: 'No vendor profile found' });
+      return;
+    }
+
+    res.json({ data: vendor });
+  } catch (error) {
+    console.error('Get my vendor error:', error);
+    res.status(500).json({ error: 'Failed to fetch vendor profile' });
   }
 });
 

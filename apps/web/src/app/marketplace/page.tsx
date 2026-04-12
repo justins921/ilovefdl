@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useCart } from '@/components/CartProvider';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, resolveImageUrl } from '@/lib/utils';
 import type { Product, Vendor, PaginatedResponse } from '@ilovefdl/shared';
 
 // ─── Sort Options ────────────────────────────────────────
@@ -95,7 +95,7 @@ function EnhancedProductCard({ product }: { product: Product }) {
       <div className="aspect-square bg-light relative overflow-hidden">
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={imageUrl ? resolveImageUrl(imageUrl) : ''}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />

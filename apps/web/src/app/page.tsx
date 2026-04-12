@@ -16,6 +16,9 @@ import BlogPostCard from '@/components/BlogPostCard';
 import SpecialCard from '@/components/SpecialCard';
 import type { BlogPost, Special } from '@ilovefdl/shared';
 
+// Re-generate this page at most every 60 seconds (ISR)
+export const revalidate = 60;
+
 async function getLatestPosts(): Promise<BlogPost[]> {
   try {
     const res = await api.getPosts({ limit: 3, status: 'PUBLISHED' });
@@ -83,7 +86,7 @@ export default async function HomePage() {
                 Read the News
               </Link>
             </div>
-            <div className="mt-12 flex items-center gap-8 text-white/50 text-sm">
+            <div className="mt-12 flex flex-wrap items-center gap-4 sm:gap-8 text-white/50 text-sm">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
                 <span>Fond du Lac, WI</span>

@@ -116,11 +116,15 @@ export default function AccountPage() {
             </div>
             <div>
               <p className="text-xs text-primary/50 uppercase tracking-wider mb-1">Member Since</p>
-              <p className="text-sm font-medium text-primary">{formatDate(user.createdAt)}</p>
+              <p className="text-sm font-medium text-primary">{user.createdAt ? formatDate(user.createdAt) : 'N/A'}</p>
             </div>
             <div>
               <p className="text-xs text-primary/50 uppercase tracking-wider mb-1">Account Type</p>
-              <p className="text-sm font-medium text-primary capitalize">{user.role.toLowerCase()}</p>
+              <p className="text-sm font-medium text-primary capitalize">
+                {user.role === 'USER' ? 'Member' :
+                 user.role === 'BAR_OWNER' ? 'Bar / Restaurant Owner' :
+                 user.role.toLowerCase().replace('_', ' ')}
+              </p>
             </div>
           </div>
         </div>
@@ -164,7 +168,7 @@ export default function AccountPage() {
             <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
           </Link>
           <Link
-            href="/messages"
+            href="/account/messages"
             className="bg-white rounded-xl border border-light p-5 hover:shadow-md transition-shadow flex items-center justify-between group"
           >
             <div className="flex items-center gap-3">

@@ -67,7 +67,7 @@ export default function AddressesPage() {
       const res = await api.getAddresses();
       setAddresses(res.data);
     } catch {
-      // Failed to fetch addresses
+      // Silently handle - user may just have no addresses yet
     } finally {
       setLoading(false);
     }
@@ -155,8 +155,16 @@ export default function AddressesPage() {
       closeModal();
       await fetchAddresses();
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
+      let message = 'Something went wrong. Please try again.';
+      if (err instanceof Error && err.message) {
+        message = err.message;
+      }
+      // Check for common issues
+      if (message.includes('401') || message.includes('Unauthorized') || message.includes('Authentication')) {
+        message = 'Your session has expired. Please log out and log back in.';
+      } else if (message.includes('Failed to create') || message.includes('Failed to update')) {
+        message = 'Unable to save your address right now. Please try again in a few minutes.';
+      }
       setError(message);
     } finally {
       setSubmitting(false);
@@ -222,13 +230,11 @@ export default function AddressesPage() {
               <div className="flex items-center gap-2 mb-2">
                 <Link
                   href="/account"
-                  className="text-primary/40 hover:text-primary/60 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-primary/40 hover:text-primary/60 transition-colors uppercase tracking-wider"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                </Link>
-                <span className="text-xs text-primary/40 uppercase tracking-wider">
                   Account
-                </span>
+                </Link>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
                 Saved Addresses
@@ -246,6 +252,19 @@ export default function AddressesPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error banner */}
+        {error && !modalOpen && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">
+            <span className="text-sm">{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Loading skeleton */}
         {loading ? (
           <div className="grid sm:grid-cols-2 gap-4">

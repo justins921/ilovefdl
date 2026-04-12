@@ -1,8 +1,9 @@
 /**
  * WordPress → I Love FDL content migration
  *
- * Pulls all published blog content from ilovefdl.com via the WP REST API,
- * maps it to the platform's Prisma models, and upserts into the database.
+ * Pulls blog posts and WooCommerce products from ilovefdl.com via the
+ * WP REST API / WC Store API, maps them to Prisma models, and upserts
+ * into the database.
  *
  * Usage:
  *   npm run migrate          (from scripts/migrate-from-wp)
@@ -12,7 +13,6 @@
  *   DATABASE_URL  — Postgres connection string (required)
  */
 
-import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import {
   fetchAllPosts,
@@ -20,19 +20,22 @@ import {
   fetchAllTags,
   fetchAllMedia,
   fetchAllUsers,
+  fetchAllWcProducts,
+  fetchAllDokanStores,
+  fetchDokanStoreProductIds,
   type WpTag,
   type WpMedia,
   type WpUser,
+  type WcProduct,
+  type DokanStore,
 } from "./wp-client.js";
-import { mapWpPostToBlogPost, stripHtmlTags } from "./mappers.js";
-import { downloadImage } from "./media.js";
+import { mapWpPostToBlogPost, mapWcProductToProduct, stripHtmlTags, generateSlug } from "./mappers.js";
+import { uploadImageToApi } from "./api-upload.js";
 
 // ─── configuration ───────────────────────────────────────
 
-const MEDIA_OUTPUT_DIR = path.resolve(
-  process.cwd(),
-  "migrated-media",
-);
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
+const MIGRATION_API_KEY = process.env.MIGRATION_API_KEY || "";
 
 // ─── stats ───────────────────────────────────────────────
 
@@ -42,6 +45,10 @@ interface MigrationStats {
   postsCreated: number;
   postsUpdated: number;
   postErrors: number;
+  productsCreated: number;
+  productsUpdated: number;
+  productErrors: number;
+  vendorsCreated: number;
   imagesDownloaded: number;
   imageErrors: number;
 }
@@ -55,6 +62,10 @@ function printStats(stats: MigrationStats): void {
   console.log(`  Posts created:      ${stats.postsCreated}`);
   console.log(`  Posts updated:      ${stats.postsUpdated}`);
   console.log(`  Post errors:        ${stats.postErrors}`);
+  console.log(`  Vendors created:    ${stats.vendorsCreated}`);
+  console.log(`  Products created:   ${stats.productsCreated}`);
+  console.log(`  Products updated:   ${stats.productsUpdated}`);
+  console.log(`  Product errors:     ${stats.productErrors}`);
   console.log(`  Images downloaded:  ${stats.imagesDownloaded}`);
   console.log(`  Image errors:       ${stats.imageErrors}`);
   console.log("========================================\n");
@@ -71,6 +82,15 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  if (!MIGRATION_API_KEY) {
+    console.error("ERROR: MIGRATION_API_KEY environment variable is not set.");
+    console.error("Set it to match the MIGRATION_API_KEY on your API server.");
+    process.exit(1);
+  }
+
+  console.log(`API server: ${API_BASE_URL}`);
+  console.log(`Migration key: ${MIGRATION_API_KEY.slice(0, 4)}...\n`);
+
   const prisma = new PrismaClient();
   const stats: MigrationStats = {
     authorsCreated: 0,
@@ -78,6 +98,10 @@ async function main(): Promise<void> {
     postsCreated: 0,
     postsUpdated: 0,
     postErrors: 0,
+    productsCreated: 0,
+    productsUpdated: 0,
+    productErrors: 0,
+    vendorsCreated: 0,
     imagesDownloaded: 0,
     imageErrors: 0,
   };
@@ -85,25 +109,33 @@ async function main(): Promise<void> {
   try {
     // ── Step 1: Fetch all WP data ──────────────────────────
 
-    console.log("[1/5] Fetching WordPress categories...");
+    console.log("[1/6] Fetching WordPress categories...");
     const wpCategories = await fetchAllCategories();
     console.log(`  Found ${wpCategories.length} categories.\n`);
 
-    console.log("[2/5] Fetching WordPress tags...");
+    console.log("[2/6] Fetching WordPress tags...");
     const wpTags = await fetchAllTags();
     console.log(`  Found ${wpTags.length} tags.\n`);
 
-    console.log("[3/5] Fetching WordPress users...");
+    console.log("[3/6] Fetching WordPress users...");
     const wpUsers = await fetchAllUsers();
     console.log(`  Found ${wpUsers.length} users.\n`);
 
-    console.log("[4/5] Fetching WordPress media...");
+    console.log("[4/6] Fetching WordPress media...");
     const wpMedia = await fetchAllMedia();
     console.log(`  Found ${wpMedia.length} media items.\n`);
 
-    console.log("[5/5] Fetching WordPress posts...");
+    console.log("[5/6] Fetching WordPress posts...");
     const wpPosts = await fetchAllPosts();
     console.log(`  Found ${wpPosts.length} posts.\n`);
+
+    console.log("[6/7] Fetching WooCommerce products...");
+    const wcProducts = await fetchAllWcProducts();
+    console.log(`  Found ${wcProducts.length} products.\n`);
+
+    console.log("[7/7] Fetching Dokan vendor stores...");
+    const dokanStores = await fetchAllDokanStores();
+    console.log(`  Found ${dokanStores.length} Dokan stores.\n`);
 
     // ── Step 2: Build lookup maps ──────────────────────────
 
@@ -150,12 +182,13 @@ async function main(): Promise<void> {
     }
     console.log("");
 
-    // ── Step 4: Download & optimise featured images ────────
+    // ── Step 4: Upload featured images to API server ────────
+    // Download from WordPress and re-host on our own API server
+    // so images survive when the WP site is retired.
 
-    console.log("Downloading featured images...");
+    console.log("Uploading featured images to API server...");
     const mediaMap: Record<number, string> = {};
 
-    // Collect unique featured media IDs from posts
     const featuredMediaIds = new Set(
       wpPosts
         .map((p) => p.featured_media)
@@ -170,14 +203,20 @@ async function main(): Promise<void> {
         continue;
       }
 
-      console.log(`  Processing media ${mediaId}: ${media.source_url}`);
-      const localPath = await downloadImage(media.source_url, MEDIA_OUTPUT_DIR);
-      if (localPath) {
-        // Store a relative path suitable for serving
-        mediaMap[mediaId] = path.relative(process.cwd(), localPath);
+      console.log(`  Uploading media ${mediaId}: ${media.source_url}`);
+      const apiPath = await uploadImageToApi(
+        media.source_url,
+        API_BASE_URL,
+        MIGRATION_API_KEY,
+      );
+
+      if (apiPath) {
+        mediaMap[mediaId] = apiPath;
         stats.imagesDownloaded++;
+        console.log(`    → ${apiPath}`);
       } else {
         stats.imageErrors++;
+        console.error(`    Failed to upload media ${mediaId}`);
       }
     }
     console.log("");
@@ -223,16 +262,236 @@ async function main(): Promise<void> {
       }
     }
 
+    // ── Step 6: Migrate WooCommerce products ────────────────
+
+    if (wcProducts.length > 0) {
+      console.log("\nMigrating WooCommerce products...");
+
+      // ── Create vendors from Dokan stores ─────────────────
+
+      // Map: Dokan store ID → platform Vendor ID
+      const dokanVendorMap: Record<number, string> = {};
+
+      if (dokanStores.length > 0) {
+        console.log("\n  Creating vendors from Dokan stores...");
+        for (const store of dokanStores) {
+          if (!store.store_name || !store.enabled) {
+            console.log(`    Skipped disabled store: ${store.store_name || store.id}`);
+            continue;
+          }
+
+          const email = store.email || `dokan-${store.id}@ilovefdl.com`;
+          const slug = store.store_name
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, "")
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "") || `vendor-${store.id}`;
+
+          // Find or create user
+          let user = await prisma.user.findUnique({ where: { email } });
+          if (!user) {
+            user = await prisma.user.create({
+              data: {
+                email,
+                name: store.store_name,
+                role: "VENDOR",
+                avatarUrl: store.gravatar || null,
+              },
+            });
+          }
+
+          // Find or create vendor
+          let vendor = await prisma.vendor.findFirst({
+            where: { userId: user.id },
+          });
+
+          if (!vendor) {
+            // Check slug uniqueness
+            const slugTaken = await prisma.vendor.findUnique({ where: { slug } });
+            const finalSlug = slugTaken ? `${slug}-${store.id}` : slug;
+
+            const addressParts = [
+              store.address?.street_1,
+              store.address?.city,
+              store.address?.state,
+              store.address?.zip,
+            ].filter(Boolean);
+
+            vendor = await prisma.vendor.create({
+              data: {
+                userId: user.id,
+                businessName: store.store_name,
+                slug: finalSlug,
+                phone: store.phone || null,
+                address: addressParts.length > 0 ? addressParts.join(", ") : null,
+                website: store.social?.url || null,
+                logo: store.gravatar || null,
+                banner: store.banner || null,
+                status: "APPROVED",
+                seoTitle: store.store_name,
+              },
+            });
+            stats.vendorsCreated++;
+            console.log(`    Created vendor: ${store.store_name} (${vendor.id})`);
+          } else {
+            console.log(`    Existing vendor: ${store.store_name} (${vendor.id})`);
+          }
+
+          dokanVendorMap[store.id] = vendor.id;
+        }
+      }
+
+      // Fallback vendor for products that can't be matched to a Dokan store
+      const wpVendorEmail = "wp-store@ilovefdl.com";
+      let fallbackVendor = await prisma.vendor.findFirst({
+        where: { user: { email: wpVendorEmail } },
+      });
+
+      if (!fallbackVendor) {
+        let wpStoreUser = await prisma.user.findUnique({
+          where: { email: wpVendorEmail },
+        });
+        if (!wpStoreUser) {
+          wpStoreUser = await prisma.user.create({
+            data: {
+              email: wpVendorEmail,
+              name: "I Love FDL Store",
+              role: "VENDOR",
+            },
+          });
+        }
+
+        fallbackVendor = await prisma.vendor.create({
+          data: {
+            userId: wpStoreUser.id,
+            businessName: "I Love FDL Marketplace",
+            slug: "ilovefdl-marketplace",
+            description:
+              "Official I Love Fond du Lac marketplace — featuring products from local FDL vendors and artisans.",
+            status: "APPROVED",
+            seoTitle: "I Love FDL Marketplace",
+            seoDescription:
+              "Shop local products from Fond du Lac businesses and artisans.",
+          },
+        });
+        stats.vendorsCreated++;
+        console.log(`    Created fallback vendor: ${fallbackVendor.businessName}`);
+      }
+
+      // Build WC product ID → vendor ID map from Dokan store products
+      const wcProductVendorMap: Record<number, string> = {};
+      if (dokanStores.length > 0) {
+        console.log("\n  Mapping products to Dokan vendors...");
+        for (const store of dokanStores) {
+          const vendorId = dokanVendorMap[store.id];
+          if (!vendorId) continue;
+
+          try {
+            const productIds = await fetchDokanStoreProductIds(store.id);
+            for (const pid of productIds) {
+              wcProductVendorMap[pid] = vendorId;
+            }
+            console.log(`    ${store.store_name}: ${productIds.length} products`);
+          } catch {
+            console.warn(`    Failed to fetch products for store ${store.store_name}`);
+          }
+        }
+      }
+
+      // Upload product images to API server
+      console.log("\n  Uploading product images to API server...");
+      const productImageMap: Record<string, string> = {};
+      const seenUrls = new Set<string>();
+      for (const product of wcProducts) {
+        for (const img of product.images) {
+          if (img.src && !seenUrls.has(img.src)) {
+            seenUrls.add(img.src);
+            console.log(`    Uploading: ${img.src}`);
+            const apiPath = await uploadImageToApi(
+              img.src,
+              API_BASE_URL,
+              MIGRATION_API_KEY,
+            );
+            if (apiPath) {
+              productImageMap[img.src] = apiPath;
+              stats.imagesDownloaded++;
+              console.log(`      → ${apiPath}`);
+            } else {
+              stats.imageErrors++;
+              console.error(`      Failed to upload product image`);
+            }
+          }
+        }
+      }
+
+      // Upsert products
+      console.log("\n  Importing products...");
+      for (const wcProduct of wcProducts) {
+        try {
+          // Skip placeholder/test products
+          if (
+            wcProduct.name.toLowerCase().includes("my product") ||
+            wcProduct.name.toLowerCase() === "test"
+          ) {
+            console.log(`  Skipped test product: ${wcProduct.name}`);
+            continue;
+          }
+
+          // Use Dokan vendor if matched, otherwise fallback
+          const vendorId = wcProductVendorMap[wcProduct.id] || fallbackVendor.id;
+
+          const data = mapWcProductToProduct(
+            wcProduct,
+            vendorId,
+            productImageMap,
+          );
+
+          // Check if product already exists by externalId
+          const existing = await prisma.product.findFirst({
+            where: { externalId: `wc-${wcProduct.id}` },
+          });
+
+          if (existing) {
+            await prisma.product.update({
+              where: { id: existing.id },
+              data,
+            });
+            stats.productsUpdated++;
+            console.log(`  Updated: [${wcProduct.id}] ${wcProduct.name}`);
+          } else {
+            // Ensure slug uniqueness
+            const slugTaken = await prisma.product.findUnique({
+              where: { slug: data.slug },
+            });
+            if (slugTaken) {
+              data.slug = `${data.slug}-wc${wcProduct.id}`;
+            }
+
+            await prisma.product.create({ data });
+            stats.productsCreated++;
+            console.log(`  Created: [${wcProduct.id}] ${wcProduct.name}`);
+          }
+        } catch (error) {
+          stats.productErrors++;
+          console.error(
+            `  ERROR migrating product ${wcProduct.id}: ${(error as Error).message}`,
+          );
+        }
+      }
+    }
+
     // ── Done ───────────────────────────────────────────────
 
     printStats(stats);
 
-    if (stats.postErrors > 0) {
+    const totalErrors = stats.postErrors + stats.productErrors;
+    if (totalErrors > 0) {
       console.log(
-        "Some posts failed to migrate. Review the errors above and re-run — the script is idempotent.\n",
+        "Some items failed to migrate. Review the errors above and re-run — the script is idempotent.\n",
       );
     } else {
-      console.log("All posts migrated successfully.\n");
+      console.log("All content migrated successfully.\n");
     }
   } finally {
     await prisma.$disconnect();

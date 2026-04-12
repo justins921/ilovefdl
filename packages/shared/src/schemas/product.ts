@@ -27,7 +27,7 @@ export const createProductSchema = z.object({
     .optional()
     .nullable(),
   images: z
-    .array(z.string().url('Each image must be a valid URL'))
+    .array(z.string().min(1, 'Image path cannot be empty'))
     .max(20, 'Maximum of 20 images allowed')
     .default([]),
   categoryTags: z
@@ -45,7 +45,9 @@ export const createProductSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
-export const updateProductSchema = createProductSchema.partial();
+export const updateProductSchema = createProductSchema.partial().extend({
+  vendorId: z.string().optional(),
+});
 
 export const productQuerySchema = z.object({
   vendorId: z.string().optional(),

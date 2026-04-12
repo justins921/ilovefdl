@@ -7,15 +7,11 @@ import {
   ShoppingBag,
   ShoppingCart,
   DollarSign,
-  Plus,
   ArrowRight,
   Package,
   Clock,
   TrendingUp,
   BarChart3,
-  Tag,
-  Truck,
-  MessageSquare,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -36,25 +32,23 @@ export default function VendorDashboardPage() {
 
     async function fetchDashboardData() {
       try {
-        const vendorsRes = await api.getVendors({ limit: 100 });
-        const myVendor = vendorsRes.data.find((v) => v.userId === user!.id);
+        const vendorRes = await api.getMyVendor();
+        const myVendor = vendorRes.data;
 
-        if (myVendor) {
-          setVendor(myVendor);
+        setVendor(myVendor);
 
-          const [productsRes, ordersRes] = await Promise.all([
-            api.getProducts({ vendorId: myVendor.id, limit: 50 }),
-            api.getOrders({ vendorId: myVendor.id, limit: 10 }),
-          ]);
+        const [productsRes, ordersRes] = await Promise.all([
+          api.getProducts({ vendorId: myVendor.id, limit: 50 }),
+          api.getOrders({ vendorId: myVendor.id, limit: 10 }),
+        ]);
 
-          setProducts(productsRes.data);
-          setOrders(ordersRes.data);
-          setTotalRevenue(
-            ordersRes.data.reduce((sum, o) => sum + o.vendorNetAmount, 0)
-          );
-        }
+        setProducts(productsRes.data);
+        setOrders(ordersRes.data);
+        setTotalRevenue(
+          ordersRes.data.reduce((sum, o) => sum + o.vendorNetAmount, 0)
+        );
       } catch {
-        // Dashboard load failed
+        // Dashboard load failed — vendor profile not found
       } finally {
         setLoading(false);
       }
@@ -72,25 +66,21 @@ export default function VendorDashboardPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-white rounded w-1/3" />
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-32 bg-white rounded-xl" />
-              ))}
-            </div>
-            <div className="h-64 bg-white rounded-xl" />
-          </div>
+      <div className="animate-pulse space-y-8 py-6">
+        <div className="h-8 bg-white rounded w-1/3" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-32 bg-white rounded-xl" />
+          ))}
         </div>
+        <div className="h-64 bg-white rounded-xl" />
       </div>
     );
   }
 
   if (!vendor) {
     return (
-      <div className="min-h-screen bg-light flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center max-w-md">
           <Store className="w-16 h-16 text-primary/20 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary mb-3">
@@ -100,7 +90,7 @@ export default function VendorDashboardPage() {
             You don&apos;t have a vendor profile yet. Apply to become a vendor
             on the I Love FDL marketplace.
           </p>
-          <Link href="/auth" className="btn-primary">
+          <Link href="/auth/vendor" className="btn-primary">
             Apply to Sell
             <ArrowRight className="w-4 h-4 ml-2" />
           </Link>
@@ -110,31 +100,27 @@ export default function VendorDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-light">
+    <div>
       {/* Header */}
-      <div className="bg-white border-b border-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-primary mb-1">
-                Vendor Dashboard
-              </h1>
-              <p className="text-primary/60">
-                Welcome back, {vendor.businessName}
-              </p>
-            </div>
-            <Link
-              href={`/vendors/${vendor.slug}`}
-              className="btn-outline text-sm"
-            >
-              <Store className="w-4 h-4 mr-2" />
-              View Storefront
-            </Link>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-primary mb-1">
+            Dashboard
+          </h1>
+          <p className="text-primary/60 text-sm">
+            Welcome back, {vendor.businessName}
+          </p>
         </div>
+        <Link
+          href={`/vendors/${vendor.slug}`}
+          className="btn-outline text-sm self-start"
+        >
+          <Store className="w-4 h-4 mr-2" />
+          View Storefront
+        </Link>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <div className="bg-white rounded-xl border border-light p-6">
@@ -144,10 +130,10 @@ export default function VendorDashboardPage() {
               </div>
               <TrendingUp className="w-4 h-4 text-teal" />
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary truncate">
               {formatPrice(totalRevenue)}
             </p>
-            <p className="text-sm text-primary/60 mt-1">Total Revenue</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Total Revenue</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -156,8 +142,8 @@ export default function VendorDashboardPage() {
                 <ShoppingCart className="w-5 h-5 text-accent" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">{orders.length}</p>
-            <p className="text-sm text-primary/60 mt-1">Orders</p>
+            <p className="text-xl sm:text-2xl font-bold text-primary">{orders.length}</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Orders</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -166,10 +152,10 @@ export default function VendorDashboardPage() {
                 <ShoppingBag className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary">
               {products.length}
             </p>
-            <p className="text-sm text-primary/60 mt-1">Products</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Products</p>
           </div>
 
           <div className="bg-white rounded-xl border border-light p-6">
@@ -178,10 +164,10 @@ export default function VendorDashboardPage() {
                 <BarChart3 className="w-5 h-5 text-teal" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl sm:text-2xl font-bold text-primary">
               {(vendor.commissionRate * 100).toFixed(0)}%
             </p>
-            <p className="text-sm text-primary/60 mt-1">Commission Rate</p>
+            <p className="text-xs sm:text-sm text-primary/60 mt-1">Commission Rate</p>
           </div>
         </div>
 
@@ -201,17 +187,17 @@ export default function VendorDashboardPage() {
                   {orders.map((order) => (
                     <div
                       key={order.id}
-                      className="px-6 py-4 flex items-center justify-between hover:bg-light/50 transition-colors"
+                      className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-light/50 transition-colors"
                     >
-                      <div>
-                        <p className="text-sm font-medium text-primary">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">
                           {order.user?.name || order.user?.email || 'Customer'}
                         </p>
                         <p className="text-xs text-primary/50">
                           {formatDate(order.createdAt)} &middot; #{order.id.slice(0, 8)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             statusColors[order.status] || 'bg-gray-100 text-gray-800'
@@ -237,99 +223,8 @@ export default function VendorDashboardPage() {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-light p-6">
-              <h3 className="font-bold text-primary mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <Link
-                  href="/dashboard/products"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Plus className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Manage Products
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href={`/vendors/${vendor.slug}`}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Store className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      View Storefront
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/integrations"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <ArrowRight className="w-5 h-5 text-teal rotate-90" />
-                    <span className="text-sm font-medium text-primary">
-                      Integrations
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/coupons"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Tag className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Coupons
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/shipping"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Truck className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Shipping Profiles
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/analytics"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Analytics
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-                <Link
-                  href="/dashboard/messages"
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-light transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <MessageSquare className="w-5 h-5 text-teal" />
-                    <span className="text-sm font-medium text-primary">
-                      Messages
-                    </span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-primary/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Products Summary */}
+          {/* Products Summary */}
+          <div>
             <div className="bg-white rounded-xl border border-light p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-primary">Your Products</h3>

@@ -16,7 +16,7 @@ import {
   Shield,
 } from 'lucide-react';
 import api from '@/lib/api';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, resolveImageUrl } from '@/lib/utils';
 import { useCart } from '@/components/CartProvider';
 import ProductReviews from '@/components/ProductReviews';
 import type { Product } from '@ilovefdl/shared';
@@ -123,7 +123,7 @@ export default function ProductDetailPage({
               {images.length > 0 ? (
                 <>
                   <img
-                    src={images[activeImage]}
+                    src={resolveImageUrl(images[activeImage])}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
@@ -175,7 +175,7 @@ export default function ProductDetailPage({
                     }`}
                   >
                     <img
-                      src={img}
+                      src={resolveImageUrl(img)}
                       alt={`${product.name} view ${i + 1}`}
                       className="w-full h-full object-cover"
                     />
@@ -248,7 +248,7 @@ export default function ProductDetailPage({
             <div className="bg-white rounded-xl p-6 border border-light mb-6">
               {product.inventory > 0 ? (
                 <>
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4">
                     <span className="text-sm font-medium text-primary">
                       Quantity
                     </span>
@@ -310,7 +310,7 @@ export default function ProductDetailPage({
             </div>
 
             {/* Trust Badges */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 text-sm text-primary/60">
                 <Truck className="w-5 h-5 text-teal flex-shrink-0" />
                 <span>Local pickup or shipping available</span>

@@ -17,6 +17,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://ilovefdl.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
+  icons: {
+    icon: '/icon.svg',
+  },
   title: {
     template: '%s | I Love FDL',
     default: 'I Love FDL - Support Local Fond du Lac',

@@ -12,6 +12,7 @@ import type {
   Product,
   Order,
   BlogPost,
+  BlogComment,
   Bar,
   Special,
   PushToken,
@@ -40,6 +41,8 @@ import type {
   Campaign,
 } from './types';
 import type {
+  RegisterVendorInput,
+  RegisterBarOwnerInput,
   CreateVendorInput,
   UpdateVendorInput,
   CreateProductInput,
@@ -93,7 +96,7 @@ export class ApiError extends Error {
   public readonly details?: Record<string, string[]>;
 
   constructor(response: ApiErrorResponse) {
-    super(response.message);
+    super(response.message || response.error || 'Unknown error');
     this.name = 'ApiError';
     this.statusCode = response.statusCode;
     this.details = response.details;
@@ -105,11 +108,15 @@ export class ApiError extends Error {
 export class ApiClient {
   private baseUrl: string;
   private token: string | null;
+  private cache: Map<string, { data: unknown; timestamp: number }>;
+  private cacheTtlMs: number;
 
   constructor(baseUrl: string, token?: string) {
     // Remove trailing slash
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.token = token ?? null;
+    this.cache = new Map();
+    this.cacheTtlMs = 30_000; // 30 seconds
   }
 
   /** Update the auth token (e.g. after login) */
@@ -120,6 +127,11 @@ export class ApiClient {
   /** Get the current auth token */
   getToken(): string | null {
     return this.token;
+  }
+
+  /** Clear the in-memory GET cache */
+  clearCache(): void {
+    this.cache.clear();
   }
 
   // ─── Core request method ──────────────────────────────
@@ -140,6 +152,15 @@ export class ApiClient {
       }
     }
 
+    // Return cached response for GET requests within TTL
+    const cacheKey = url.toString();
+    if (method === 'GET') {
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.cacheTtlMs) {
+        return cached.data as T;
+      }
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -157,7 +178,13 @@ export class ApiClient {
     if (!response.ok) {
       let errorBody: ApiErrorResponse;
       try {
-        errorBody = (await response.json()) as ApiErrorResponse;
+        const json = await response.json();
+        errorBody = {
+          error: json.error || 'UnknownError',
+          message: json.message || json.error || `Request failed with status ${response.status}`,
+          statusCode: json.statusCode || response.status,
+          details: json.details,
+        };
       } catch {
         errorBody = {
           error: 'UnknownError',
@@ -173,7 +200,19 @@ export class ApiClient {
       return undefined as T;
     }
 
-    return (await response.json()) as T;
+    const data = (await response.json()) as T;
+
+    // Cache successful GET responses
+    if (method === 'GET') {
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+
+    // Invalidate cache on mutations (POST/PUT/PATCH/DELETE)
+    if (method !== 'GET') {
+      this.cache.clear();
+    }
+
+    return data;
   }
 
   private get<T>(
@@ -211,6 +250,16 @@ export class ApiClient {
     return this.post<ApiResponse<LoginResponse>>('/auth/register', { email, password, name });
   }
 
+  /** Register as a vendor (creates account + vendor profile) */
+  async registerVendor(data: RegisterVendorInput): Promise<ApiResponse<LoginResponse>> {
+    return this.post<ApiResponse<LoginResponse>>('/auth/register-vendor', data);
+  }
+
+  /** Register as a bar/restaurant owner (creates account + bar listing) */
+  async registerBarOwner(data: RegisterBarOwnerInput): Promise<ApiResponse<LoginResponse>> {
+    return this.post<ApiResponse<LoginResponse>>('/auth/register-bar-owner', data);
+  }
+
   /** Get the current authenticated user */
   async getMe(): Promise<ApiResponse<User>> {
     return this.get<ApiResponse<User>>('/auth/me');
@@ -238,6 +287,11 @@ export class ApiClient {
   /** Get a single vendor by ID or slug */
   async getVendor(idOrSlug: string): Promise<ApiResponse<Vendor>> {
     return this.get<ApiResponse<Vendor>>(`/vendors/${idOrSlug}`);
+  }
+
+  /** Get the current user's vendor profile */
+  async getMyVendor(): Promise<ApiResponse<Vendor>> {
+    return this.get<ApiResponse<Vendor>>('/vendors/me');
   }
 
   /** Create a new vendor profile */
@@ -319,9 +373,22 @@ export class ApiClient {
     return this.get<PaginatedResponse<BlogPost>>('/posts', params as Record<string, string | number | boolean | undefined>);
   }
 
-  /** Get a single blog post by ID or slug */
-  async getPost(idOrSlug: string): Promise<ApiResponse<BlogPost>> {
-    return this.get<ApiResponse<BlogPost>>(`/posts/${idOrSlug}`);
+  /** Get a single blog post by ID or slug (includes prevPost/nextPost) */
+  async getPost(idOrSlug: string): Promise<ApiResponse<BlogPost & {
+    prevPost?: { slug: string; title: string; featuredImage: string | null } | null;
+    nextPost?: { slug: string; title: string; featuredImage: string | null } | null;
+  }>> {
+    return this.get(`/posts/${idOrSlug}`);
+  }
+
+  /** Get comments for a blog post */
+  async getPostComments(slug: string): Promise<ApiResponse<BlogComment[]>> {
+    return this.get(`/posts/${slug}/comments`);
+  }
+
+  /** Add a comment to a blog post */
+  async createPostComment(slug: string, data: { name: string; email?: string; body: string }): Promise<ApiResponse<BlogComment>> {
+    return this.post(`/posts/${slug}/comments`, data);
   }
 
   /** Create a new blog post */
@@ -372,7 +439,7 @@ export class ApiClient {
 
   /** List specials for a bar, optionally filtered by day */
   async getSpecials(
-    params?: PaginationParams & { barId?: string; dayOfWeek?: string },
+    params?: PaginationParams & { barId?: string; day?: string },
   ): Promise<PaginatedResponse<Special>> {
     return this.get<PaginatedResponse<Special>>('/specials', params as Record<string, string | number | boolean | undefined>);
   }
@@ -392,23 +459,28 @@ export class ApiClient {
     return this.put<ApiResponse<Special>>(`/specials/${id}`, data);
   }
 
+  /** Delete a special */
+  async deleteSpecial(id: string): Promise<void> {
+    return this.delete(`/specials/${id}`);
+  }
+
   // ─── PUSH NOTIFICATIONS ──────────────────────────────
 
   /** Register a push notification token for the current user */
   async registerPushToken(data: RegisterPushTokenInput): Promise<ApiResponse<PushToken>> {
-    return this.post<ApiResponse<PushToken>>('/push-tokens', data);
+    return this.post<ApiResponse<PushToken>>('/push/register', data);
   }
 
   /** Update notification preferences for the current user */
   async updateNotificationPreferences(
     data: UpdateNotificationPreferenceInput,
   ): Promise<ApiResponse<NotificationPreference>> {
-    return this.put<ApiResponse<NotificationPreference>>('/notification-preferences', data);
+    return this.put<ApiResponse<NotificationPreference>>('/push/preferences', data);
   }
 
   /** Get notification preferences for the current user */
   async getNotificationPreferences(): Promise<ApiResponse<NotificationPreference>> {
-    return this.get<ApiResponse<NotificationPreference>>('/notification-preferences');
+    return this.get<ApiResponse<NotificationPreference>>('/push/preferences');
   }
 
   // ─── INTEGRATIONS ──────────────────────────────────────
@@ -656,6 +728,21 @@ export class ApiClient {
     return this.get<PaginatedResponse<User>>('/admin/users', params as Record<string, string | number | boolean | undefined>);
   }
 
+  /** Admin: update a user's role */
+  async adminUpdateUserRole(id: string, role: string): Promise<ApiResponse<User>> {
+    return this.put<ApiResponse<User>>(`/admin/users/${id}/role`, { role });
+  }
+
+  /** Admin: list all bars */
+  async adminGetBars(params?: { status?: string }): Promise<ApiResponse<Bar[]>> {
+    return this.get<ApiResponse<Bar[]>>('/admin/bars', params as Record<string, string | number | boolean | undefined>);
+  }
+
+  /** Admin: approve or deny a bar application */
+  async adminApproveBar(id: string, approved: boolean): Promise<ApiResponse<{ id: string; approved: boolean }>> {
+    return this.put<ApiResponse<{ id: string; approved: boolean }>>(`/admin/bars/${id}/approve`, { approved });
+  }
+
   // ─── ABANDONED CARTS ──────────────────────────────────
 
   /** Save an abandoned cart */
@@ -851,5 +938,39 @@ export class ApiClient {
     destination: { state: string; postalCode: string; country: string };
   }): Promise<ApiResponse<Array<{ carrier: string; service: string; rate: number; estimatedDays: string }>>> {
     return this.post('/shipping/rates', data);
+  }
+
+  // ─── UPLOADS ──────────────────────────────────────────
+
+  /** Upload one or more images, returns array of paths */
+  async uploadImages(files: File[]): Promise<ApiResponse<string[]>> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('images', file);
+    }
+
+    const url = `${this.baseUrl}/uploads/images`;
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorBody;
+      try {
+        errorBody = await response.json();
+      } catch {
+        errorBody = { error: 'UploadFailed', message: `Upload failed with status ${response.status}`, statusCode: response.status };
+      }
+      throw new ApiError(errorBody);
+    }
+
+    return (await response.json()) as ApiResponse<string[]>;
   }
 }

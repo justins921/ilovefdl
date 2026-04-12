@@ -33,6 +33,8 @@ import subscriptionRoutes from './routes/subscriptions';
 import campaignRoutes from './routes/campaigns';
 import currencyRoutes from './routes/currency';
 import shippingRateRoutes from './routes/shipping-rates';
+import uploadRoutes from './routes/uploads';
+import webhookRoutes from './routes/webhooks';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -48,13 +50,14 @@ app.use(
   })
 );
 
-// ─── Stripe webhook route (must be before JSON parsing) ──
-// Raw body is required for Stripe webhook signature verification
+// ─── Webhook routes (must be before JSON parsing for signature verification) ──
 app.post(
   '/webhooks/stripe',
   express.raw({ type: 'application/json' }),
   orderRoutes
 );
+// Square & Shopify webhooks use JSON parsing (signatures verified in handler)
+app.use('/webhooks', express.json(), webhookRoutes);
 
 // ─── Body parsing ────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -90,15 +93,23 @@ app.use(authMiddleware);
 // ─── Static file serving for uploads ─────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+// ─── Cache Control for public GET endpoints ─────────────
+const publicCacheControl: express.RequestHandler = (req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  }
+  next();
+};
+
 // ─── API Routes ──────────────────────────────────────────
 app.use('/auth', authRateLimit, authRoutes);
-app.use('/vendors', vendorRoutes);
-app.use('/products', productRoutes);
+app.use('/vendors', publicCacheControl, vendorRoutes);
+app.use('/products', publicCacheControl, productRoutes);
 app.use('/checkout', orderRoutes);
 app.use('/orders', orderRoutes);
-app.use('/posts', blogRoutes);
-app.use('/bars', barRoutes);
-app.use('/specials', specialRoutes);
+app.use('/posts', publicCacheControl, blogRoutes);
+app.use('/bars', publicCacheControl, barRoutes);
+app.use('/specials', publicCacheControl, specialRoutes);
 app.use('/push', notificationRoutes);
 app.use('/integrations', integrationRoutes);
 app.use('/reviews', reviewRoutes);
@@ -119,6 +130,7 @@ app.use('/subscriptions', subscriptionRoutes);
 app.use('/campaigns', campaignRoutes);
 app.use('/currency', currencyRoutes);
 app.use('/shipping', shippingRateRoutes);
+app.use('/uploads', uploadRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {
@@ -143,9 +155,15 @@ app.use(
 );
 
 // ─── Start server ────────────────────────────────────────
+import prisma from './utils/prisma';
+import { startInventorySyncJob } from './jobs/sync-inventory';
+
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`API server running on 0.0.0.0:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Start background inventory sync (pulls from Square/Shopify every 15 min)
+  startInventorySyncJob(prisma);
 });
 
 export default app;

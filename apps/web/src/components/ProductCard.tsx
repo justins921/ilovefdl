@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, resolveImageUrl } from '@/lib/utils';
 import type { Product } from '@ilovefdl/shared';
 
 interface ProductCardProps {
@@ -16,8 +16,9 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="aspect-square bg-light relative overflow-hidden">
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={resolveImageUrl(imageUrl)}
             alt={product.name}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (

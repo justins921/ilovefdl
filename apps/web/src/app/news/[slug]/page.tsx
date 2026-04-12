@@ -12,26 +12,53 @@ import {
   Facebook,
   Twitter,
   Newspaper,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquare,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import api from '@/lib/api';
-import { formatDate, formatCategoryName } from '@/lib/utils';
+import { useAuth } from '@/components/AuthProvider';
+import { formatDate, formatCategoryName, resolveImageUrl } from '@/lib/utils';
 import BlogPostCard from '@/components/BlogPostCard';
-import type { BlogPost } from '@ilovefdl/shared';
+import type { BlogPost, BlogComment } from '@ilovefdl/shared';
 
 export default function BlogPostPage({
   params,
 }: {
   params: { slug: string };
 }) {
+  const { user } = useAuth();
   const [post, setPost] = useState<BlogPost | null>(null);
+  const [prevPost, setPrevPost] = useState<{ slug: string; title: string; featuredImage: string | null } | null>(null);
+  const [nextPost, setNextPost] = useState<{ slug: string; title: string; featuredImage: string | null } | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
+  const [comments, setComments] = useState<BlogComment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Comment form
+  const [commentName, setCommentName] = useState('');
+  const [commentEmail, setCommentEmail] = useState('');
+  const [commentBody, setCommentBody] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentSuccess, setCommentSuccess] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
         const res = await api.getPost(params.slug);
         setPost(res.data);
+        setPrevPost(res.data.prevPost ?? null);
+        setNextPost(res.data.nextPost ?? null);
+
+        // Fetch comments
+        try {
+          const commentsRes = await api.getPostComments(params.slug);
+          setComments(commentsRes.data);
+        } catch {
+          // Silently fail
+        }
 
         // Fetch related posts from same category
         if (res.data.category) {
@@ -56,6 +83,27 @@ export default function BlogPostPage({
     }
     fetchData();
   }, [params.slug]);
+
+  async function handleSubmitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentBody.trim()) return;
+    setSubmittingComment(true);
+    try {
+      const res = await api.createPostComment(params.slug, {
+        name: commentName || user?.name || 'Anonymous',
+        email: commentEmail || undefined,
+        body: commentBody,
+      });
+      setComments((prev) => [res.data, ...prev]);
+      setCommentBody('');
+      setCommentSuccess(true);
+      setTimeout(() => setCommentSuccess(false), 3000);
+    } catch {
+      // Failed to post comment
+    } finally {
+      setSubmittingComment(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -105,18 +153,18 @@ export default function BlogPostPage({
     <div className="min-h-screen bg-light">
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-primary/60 mb-8">
-          <Link href="/news" className="hover:text-teal transition-colors">
+        <nav className="flex items-center gap-2 text-xs sm:text-sm text-primary/60 mb-8 overflow-hidden">
+          <Link href="/news" className="hover:text-teal transition-colors shrink-0">
             News
           </Link>
-          <span>/</span>
+          <span className="shrink-0">/</span>
           <Link
             href={`/news?category=${post.category}`}
-            className="hover:text-teal transition-colors"
+            className="hover:text-teal transition-colors shrink-0"
           >
             {formatCategoryName(post.category)}
           </Link>
-          <span>/</span>
+          <span className="shrink-0">/</span>
           <span className="text-primary truncate">{post.title}</span>
         </nav>
 
@@ -169,7 +217,7 @@ export default function BlogPostPage({
         {post.featuredImage && (
           <div className="aspect-[16/9] rounded-xl overflow-hidden mb-10">
             <img
-              src={post.featuredImage}
+              src={resolveImageUrl(post.featuredImage)}
               alt={post.title}
               className="w-full h-full object-cover"
             />
@@ -178,7 +226,7 @@ export default function BlogPostPage({
 
         {/* Content */}
         <div
-          className="prose prose-lg max-w-none text-primary/80 leading-relaxed mb-12"
+          className="prose prose-sm sm:prose-lg max-w-none text-primary/80 leading-relaxed mb-12"
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 
@@ -211,6 +259,158 @@ export default function BlogPostPage({
           >
             <Share2 className="w-5 h-5" />
           </button>
+        </div>
+        {/* Previous / Next Post Navigation */}
+        {(prevPost || nextPost) && (
+          <div className="grid sm:grid-cols-2 gap-4 mb-16">
+            {prevPost ? (
+              <Link
+                href={`/news/${prevPost.slug}`}
+                className="flex items-center gap-4 p-4 rounded-xl bg-white border border-light hover:border-teal/30 transition-colors group"
+              >
+                <ChevronLeft className="w-5 h-5 text-primary/30 group-hover:text-teal flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-primary/50 mb-1">Previous Post</p>
+                  <p className="text-sm font-medium text-primary truncate group-hover:text-teal transition-colors">
+                    {prevPost.title}
+                  </p>
+                </div>
+              </Link>
+            ) : (
+              <div />
+            )}
+            {nextPost ? (
+              <Link
+                href={`/news/${nextPost.slug}`}
+                className="flex items-center justify-end gap-4 p-4 rounded-xl bg-white border border-light hover:border-teal/30 transition-colors group text-right"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs text-primary/50 mb-1">Next Post</p>
+                  <p className="text-sm font-medium text-primary truncate group-hover:text-teal transition-colors">
+                    {nextPost.title}
+                  </p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-primary/30 group-hover:text-teal flex-shrink-0" />
+              </Link>
+            ) : (
+              <div />
+            )}
+          </div>
+        )}
+
+        {/* Comments Section */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2">
+            <MessageSquare className="w-6 h-6" />
+            Comments {comments.length > 0 && `(${comments.length})`}
+          </h2>
+
+          {/* Leave a Reply */}
+          <div className="bg-white rounded-xl border border-light p-6 mb-8">
+            <h3 className="font-semibold text-primary mb-4">Leave a Reply</h3>
+            {commentSuccess && (
+              <div className="p-3 mb-4 bg-teal/10 border border-teal/20 rounded-lg text-teal text-sm">
+                Your comment has been posted!
+              </div>
+            )}
+            <form onSubmit={handleSubmitComment} className="space-y-4">
+              {!user && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-1">
+                      Name <span className="text-accent">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={commentName}
+                      onChange={(e) => setCommentName(e.target.value)}
+                      className="input-field w-full"
+                      placeholder="Your name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-1">
+                      Email <span className="text-primary/40">(optional)</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={commentEmail}
+                      onChange={(e) => setCommentEmail(e.target.value)}
+                      className="input-field w-full"
+                      placeholder="your@email.com"
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">
+                  Comment <span className="text-accent">*</span>
+                </label>
+                <textarea
+                  value={commentBody}
+                  onChange={(e) => setCommentBody(e.target.value)}
+                  className="input-field w-full h-28 resize-y"
+                  placeholder="Share your thoughts..."
+                  required
+                  maxLength={5000}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submittingComment || !commentBody.trim()}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                {submittingComment ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                Post Comment
+              </button>
+            </form>
+          </div>
+
+          {/* Comments List */}
+          {comments.length > 0 ? (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id} className="bg-white rounded-xl border border-light p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    {comment.user?.avatarUrl ? (
+                      <img
+                        src={comment.user.avatarUrl}
+                        alt={comment.name}
+                        className="w-9 h-9 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-teal/10 flex items-center justify-center">
+                        <User className="w-4 h-4 text-teal" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-primary">
+                        {comment.user?.name || comment.name}
+                      </p>
+                      <p className="text-xs text-primary/50">
+                        {formatDate(comment.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-primary/70 text-sm leading-relaxed whitespace-pre-wrap">
+                    {comment.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-white rounded-xl border border-light">
+              <MessageSquare className="w-8 h-8 text-primary/20 mx-auto mb-2" />
+              <p className="text-primary/50 text-sm">
+                No comments yet. Be the first to share your thoughts!
+              </p>
+            </div>
+          )}
         </div>
       </article>
 

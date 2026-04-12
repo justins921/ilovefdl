@@ -25,8 +25,9 @@ interface ProductFormData {
   description: string;
   categoryTags: string;
   inventory: string;
-  images: string[];
+  existingImages: string[];
   isActive: boolean;
+  vendorId: string;
 }
 
 const emptyForm: ProductFormData = {
@@ -36,23 +37,28 @@ const emptyForm: ProductFormData = {
   description: '',
   categoryTags: '',
   inventory: '0',
-  images: [''],
+  existingImages: [],
   isActive: true,
+  vendorId: '',
 };
 
 export default function ProductsPage() {
   const { user } = useAuth();
   const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [allVendors, setAllVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isAdmin = user?.role === 'ADMIN';
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -67,15 +73,24 @@ export default function ProductsPage() {
       }
 
       const vendorsRes = await api.getVendors({ limit: 100 });
-      const myVendor = vendorsRes.data.find((v) => v.userId === user.id);
+      setAllVendors(vendorsRes.data);
 
-      if (myVendor) {
+      if (user.role === 'ADMIN') {
+        // Admins see all products and can reassign to any vendor
+        const myVendor = vendorsRes.data[0] ?? null;
         setVendor(myVendor);
-        const productsRes = await api.getProducts({
-          vendorId: myVendor.id,
-          limit: 100,
-        });
+        const productsRes = await api.getProducts({ limit: 100 });
         setProducts(productsRes.data);
+      } else {
+        const myVendor = vendorsRes.data.find((v) => v.userId === user.id);
+        if (myVendor) {
+          setVendor(myVendor);
+          const productsRes = await api.getProducts({
+            vendorId: myVendor.id,
+            limit: 100,
+          });
+          setProducts(productsRes.data);
+        }
       }
     } catch {
       setError('Failed to load products.');
@@ -92,8 +107,14 @@ export default function ProductsPage() {
 
   function openAddModal() {
     setEditingProduct(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      vendorId: vendor?.id || '',
+    });
+    setPendingFiles([]);
+    setFilePreviews([]);
     setFormError(null);
+    document.body.style.overflow = 'hidden';
     setModalOpen(true);
   }
 
@@ -108,11 +129,14 @@ export default function ProductsPage() {
       description: product.description || '',
       categoryTags: product.categoryTags.join(', '),
       inventory: String(product.inventory),
-      images:
-        product.images.length > 0 ? [...product.images] : [''],
+      existingImages: product.images.length > 0 ? [...product.images] : [],
       isActive: product.isActive,
+      vendorId: product.vendorId,
     });
+    setPendingFiles([]);
+    setFilePreviews([]);
     setFormError(null);
+    document.body.style.overflow = 'hidden';
     setModalOpen(true);
   }
 
@@ -120,7 +144,10 @@ export default function ProductsPage() {
     setModalOpen(false);
     setEditingProduct(null);
     setForm(emptyForm);
+    setPendingFiles([]);
+    setFilePreviews([]);
     setFormError(null);
+    document.body.style.overflow = '';
   }
 
   // ─── Form Field Handlers ─────────────────────────────────
@@ -129,23 +156,32 @@ export default function ProductsPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function updateImage(index: number, value: string) {
-    setForm((prev) => {
-      const images = [...prev.images];
-      images[index] = value;
-      return { ...prev, images };
-    });
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setPendingFiles((prev) => [...prev, ...files]);
+    // Generate previews
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setFilePreviews((prev) => [...prev, ev.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
   }
 
-  function addImageField() {
-    setForm((prev) => ({ ...prev, images: [...prev.images, ''] }));
+  function removeExistingImage(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      existingImages: prev.existingImages.filter((_, i) => i !== index),
+    }));
   }
 
-  function removeImageField(index: number) {
-    setForm((prev) => {
-      const images = prev.images.filter((_, i) => i !== index);
-      return { ...prev, images: images.length === 0 ? [''] : images };
-    });
+  function removePendingFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index));
   }
 
   // ─── Submit Handler ──────────────────────────────────────
@@ -186,14 +222,28 @@ export default function ProductsPage() {
       return;
     }
 
-    const images = form.images
-      .map((url) => url.trim())
-      .filter((url) => url.length > 0);
-
     const categoryTags = form.categoryTags
       .split(',')
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
+
+    setSaving(true);
+
+    // Upload any new image files first
+    let uploadedPaths: string[] = [];
+    if (pendingFiles.length > 0) {
+      try {
+        const uploadRes = await api.uploadImages(pendingFiles);
+        uploadedPaths = uploadRes.data;
+      } catch {
+        setFormError('Failed to upload images. Please try again.');
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Combine existing images with newly uploaded ones
+    const images = [...form.existingImages, ...uploadedPaths];
 
     const payload = {
       name,
@@ -206,9 +256,8 @@ export default function ProductsPage() {
       inventory,
       isActive: form.isActive,
       externalPlatform: ExternalPlatform.NATIVE,
+      ...(form.vendorId ? { vendorId: form.vendorId } : {}),
     };
-
-    setSaving(true);
 
     try {
       if (editingProduct) {
@@ -295,16 +344,16 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="bg-white border-b border-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-primary mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-1">
                 My Products
               </h1>
-              <p className="text-primary/60">
+              <p className="text-primary/60 text-sm sm:text-base">
                 Manage your product listings for {vendor.businessName}
               </p>
             </div>
-            <button onClick={openAddModal} className="btn-primary">
+            <button onClick={openAddModal} className="btn-primary self-start">
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </button>
@@ -328,145 +377,224 @@ export default function ProductsPage() {
 
         {/* Products Table */}
         {products.length > 0 ? (
-          <div className="bg-white rounded-xl border border-light overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-light">
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
-                      Product
-                    </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
-                      Price
-                    </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
-                      Inventory
-                    </th>
-                    <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
-                      Status
-                    </th>
-                    <th className="text-right text-xs font-semibold text-primary/50 uppercase tracking-wider px-6 py-4">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-light">
-                  {products.map((product) => (
-                    <tr
-                      key={product.id}
-                      className="hover:bg-light/50 transition-colors"
-                    >
-                      {/* Product info */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          {product.images?.[0] ? (
-                            <img
-                              src={product.images[0]}
-                              alt={product.name}
-                              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-light flex items-center justify-center flex-shrink-0">
-                              <Package className="w-5 h-5 text-primary/20" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-primary truncate">
-                              {product.name}
-                            </p>
-                            {product.categoryTags.length > 0 && (
-                              <p className="text-xs text-primary/50 truncate mt-0.5">
-                                {product.categoryTags.join(', ')}
-                              </p>
+          <div className="space-y-3 sm:space-y-0">
+            {/* Desktop Table */}
+            <div className="hidden sm:block bg-white rounded-xl border border-light overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-light">
+                      <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 py-3">
+                        Product
+                      </th>
+                      <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 py-3">
+                        Price
+                      </th>
+                      <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 py-3">
+                        Inventory
+                      </th>
+                      <th className="text-left text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 py-3">
+                        Status
+                      </th>
+                      <th className="text-right text-xs font-semibold text-primary/50 uppercase tracking-wider px-4 py-3">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-light">
+                    {products.map((product) => (
+                      <tr
+                        key={product.id}
+                        className="hover:bg-light/50 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {product.images?.[0] ? (
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-light flex items-center justify-center flex-shrink-0">
+                                <Package className="w-4 h-4 text-primary/20" />
+                              </div>
                             )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-primary truncate">
+                                {product.name}
+                              </p>
+                              {product.vendor && (
+                                <p className="text-xs text-teal truncate mt-0.5">
+                                  {product.vendor.businessName}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-
-                      {/* Price */}
-                      <td className="px-6 py-4">
-                        <div>
+                        </td>
+                        <td className="px-4 py-3">
                           <span className="text-sm font-medium text-primary">
                             {formatPrice(product.price)}
                           </span>
                           {product.compareAtPrice != null &&
                             product.compareAtPrice > product.price && (
-                              <span className="text-xs text-primary/40 line-through ml-2">
+                              <span className="text-xs text-primary/40 line-through ml-1">
                                 {formatPrice(product.compareAtPrice)}
                               </span>
                             )}
-                        </div>
-                      </td>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`text-sm font-medium ${
+                              product.inventory === 0
+                                ? 'text-red-500'
+                                : product.inventory <= 5
+                                  ? 'text-yellow-600'
+                                  : 'text-primary'
+                            }`}
+                          >
+                            {product.inventory}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {product.isActive ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal/10 text-teal">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => openEditModal(product)}
+                              className="p-2 rounded-lg text-primary/50 hover:text-accent hover:bg-accent/10 transition-colors"
+                              title="Edit product"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            {deletingId === product.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleDelete(product.id)}
+                                  className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setDeletingId(null)}
+                                  className="px-2 py-1 text-xs font-medium text-primary/50 bg-light rounded hover:bg-gray-200 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setDeletingId(product.id)}
+                                className="p-2 rounded-lg text-primary/50 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="Deactivate product"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-                      {/* Inventory */}
-                      <td className="px-6 py-4">
+            {/* Mobile Card Layout */}
+            <div className="sm:hidden space-y-3">
+              {products.map((product) => (
+                <div
+                  key={product.id}
+                  className="bg-white rounded-xl border border-light p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    {product.images?.[0] ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg bg-light flex items-center justify-center flex-shrink-0">
+                        <Package className="w-6 h-6 text-primary/20" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-primary truncate">
+                        {product.name}
+                      </p>
+                      {product.vendor && (
+                        <p className="text-xs text-teal truncate mt-0.5">
+                          {product.vendor.businessName}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-sm font-bold text-primary">
+                          {formatPrice(product.price)}
+                        </span>
                         <span
-                          className={`text-sm font-medium ${
+                          className={`text-xs ${
                             product.inventory === 0
                               ? 'text-red-500'
-                              : product.inventory <= 5
-                                ? 'text-yellow-600'
-                                : 'text-primary'
+                              : 'text-primary/50'
                           }`}
                         >
-                          {product.inventory}
+                          {product.inventory} in stock
                         </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-6 py-4">
                         {product.isActive ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal/10 text-teal">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-teal/10 text-teal">
                             Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">
                             Inactive
                           </span>
                         )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => openEditModal(product)}
+                        className="p-2 rounded-lg text-primary/50 hover:text-accent hover:bg-accent/10 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {deletingId === product.id ? (
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={() => openEditModal(product)}
-                            className="p-2 rounded-lg text-primary/50 hover:text-accent hover:bg-accent/10 transition-colors"
-                            title="Edit product"
+                            onClick={() => handleDelete(product.id)}
+                            className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded"
                           >
-                            <Pencil className="w-4 h-4" />
+                            Yes
                           </button>
-
-                          {deletingId === product.id ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleDelete(product.id)}
-                                className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setDeletingId(null)}
-                                className="px-2 py-1 text-xs font-medium text-primary/50 bg-light rounded hover:bg-gray-200 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeletingId(product.id)}
-                              className="p-2 rounded-lg text-primary/50 hover:text-red-500 hover:bg-red-50 transition-colors"
-                              title="Deactivate product"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setDeletingId(null)}
+                            className="px-2 py-1 text-xs font-medium text-primary/50 bg-light rounded"
+                          >
+                            No
+                          </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      ) : (
+                        <button
+                          onClick={() => setDeletingId(product.id)}
+                          className="p-2 rounded-lg text-primary/50 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
@@ -490,7 +618,7 @@ export default function ProductsPage() {
 
       {/* ─── Modal ───────────────────────────────────────────── */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-primary/40 backdrop-blur-sm"
@@ -498,9 +626,9 @@ export default function ProductsPage() {
           />
 
           {/* Modal Content */}
-          <div className="relative bg-white rounded-xl border border-light shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white sm:rounded-xl border border-light shadow-xl w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto overscroll-contain">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-light px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
+            <div className="sticky top-0 bg-white border-b border-light px-4 sm:px-6 py-4 flex items-center justify-between sm:rounded-t-xl z-10">
               <h2 className="text-lg font-bold text-primary">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h2>
@@ -513,7 +641,7 @@ export default function ProductsPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                   {formError}
@@ -540,8 +668,30 @@ export default function ProductsPage() {
                 )}
               </div>
 
+              {/* Vendor Assignment */}
+              {allVendors.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-primary mb-1.5">
+                    Vendor <span className="text-accent">*</span>
+                  </label>
+                  <select
+                    value={form.vendorId}
+                    onChange={(e) => updateField('vendorId', e.target.value)}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Select a vendor...</option>
+                    {allVendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.businessName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Price + Compare At Price */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary mb-1.5">
                     Price ($) <span className="text-accent">*</span>
@@ -630,36 +780,71 @@ export default function ProductsPage() {
                 <label className="block text-sm font-medium text-primary mb-1.5">
                   Images
                 </label>
-                <div className="space-y-2">
-                  {form.images.map((url, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="url"
-                        value={url}
-                        onChange={(e) => updateImage(index, e.target.value)}
-                        placeholder="https://example.com/image.jpg"
-                        className="input-field"
-                      />
-                      {form.images.length > 1 && (
+
+                {/* Existing images (already uploaded) */}
+                {form.existingImages.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {form.existingImages.map((url, index) => (
+                      <div key={`existing-${index}`} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Product ${index + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg border border-light"
+                        />
                         <button
                           type="button"
-                          onClick={() => removeImageField(index)}
-                          className="p-2 rounded-lg text-primary/40 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                          onClick={() => removeExistingImage(index)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3 h-3" />
                         </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={addImageField}
-                  className="mt-2 inline-flex items-center text-sm text-teal hover:text-teal/80 transition-colors"
-                >
-                  <ImagePlus className="w-4 h-4 mr-1" />
-                  Add another image
-                </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New file previews */}
+                {filePreviews.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {filePreviews.map((preview, index) => (
+                      <div key={`new-${index}`} className="relative group">
+                        <img
+                          src={preview}
+                          alt={`New ${index + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg border-2 border-teal/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePendingFile(index)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-0 left-0 right-0 bg-teal text-white text-[10px] text-center rounded-b-lg">
+                          New
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload button */}
+                <label className="inline-flex items-center gap-2 px-4 py-2 bg-light text-primary text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors cursor-pointer">
+                  <ImagePlus className="w-4 h-4" />
+                  {form.existingImages.length + pendingFiles.length === 0
+                    ? 'Upload Images'
+                    : 'Add More Images'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-xs text-primary/40 mt-1">
+                  JPEG, PNG, WebP, or GIF. Max 10MB per image.
+                </p>
               </div>
 
               {/* Active Toggle */}
