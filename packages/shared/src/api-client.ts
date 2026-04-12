@@ -108,11 +108,15 @@ export class ApiError extends Error {
 export class ApiClient {
   private baseUrl: string;
   private token: string | null;
+  private cache: Map<string, { data: unknown; timestamp: number }>;
+  private cacheTtlMs: number;
 
   constructor(baseUrl: string, token?: string) {
     // Remove trailing slash
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.token = token ?? null;
+    this.cache = new Map();
+    this.cacheTtlMs = 30_000; // 30 seconds
   }
 
   /** Update the auth token (e.g. after login) */
@@ -123,6 +127,11 @@ export class ApiClient {
   /** Get the current auth token */
   getToken(): string | null {
     return this.token;
+  }
+
+  /** Clear the in-memory GET cache */
+  clearCache(): void {
+    this.cache.clear();
   }
 
   // ─── Core request method ──────────────────────────────
@@ -140,6 +149,15 @@ export class ApiClient {
         if (value !== undefined) {
           url.searchParams.set(key, String(value));
         }
+      }
+    }
+
+    // Return cached response for GET requests within TTL
+    const cacheKey = url.toString();
+    if (method === 'GET') {
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.cacheTtlMs) {
+        return cached.data as T;
       }
     }
 
@@ -182,7 +200,19 @@ export class ApiClient {
       return undefined as T;
     }
 
-    return (await response.json()) as T;
+    const data = (await response.json()) as T;
+
+    // Cache successful GET responses
+    if (method === 'GET') {
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+
+    // Invalidate cache on mutations (POST/PUT/PATCH/DELETE)
+    if (method !== 'GET') {
+      this.cache.clear();
+    }
+
+    return data;
   }
 
   private get<T>(

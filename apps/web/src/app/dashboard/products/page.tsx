@@ -107,10 +107,14 @@ export default function ProductsPage() {
 
   function openAddModal() {
     setEditingProduct(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      vendorId: vendor?.id || '',
+    });
     setPendingFiles([]);
     setFilePreviews([]);
     setFormError(null);
+    document.body.style.overflow = 'hidden';
     setModalOpen(true);
   }
 
@@ -132,6 +136,7 @@ export default function ProductsPage() {
     setPendingFiles([]);
     setFilePreviews([]);
     setFormError(null);
+    document.body.style.overflow = 'hidden';
     setModalOpen(true);
   }
 
@@ -142,6 +147,7 @@ export default function ProductsPage() {
     setPendingFiles([]);
     setFilePreviews([]);
     setFormError(null);
+    document.body.style.overflow = '';
   }
 
   // ─── Form Field Handlers ─────────────────────────────────
@@ -612,7 +618,7 @@ export default function ProductsPage() {
 
       {/* ─── Modal ───────────────────────────────────────────── */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-primary/40 backdrop-blur-sm"
@@ -620,9 +626,9 @@ export default function ProductsPage() {
           />
 
           {/* Modal Content */}
-          <div className="relative bg-white rounded-xl border border-light shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white sm:rounded-xl border border-light shadow-xl w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto overscroll-contain">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-light px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
+            <div className="sticky top-0 bg-white border-b border-light px-4 sm:px-6 py-4 flex items-center justify-between sm:rounded-t-xl z-10">
               <h2 className="text-lg font-bold text-primary">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h2>
@@ -635,7 +641,7 @@ export default function ProductsPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                   {formError}

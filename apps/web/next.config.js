@@ -8,6 +8,12 @@ const nextConfig = {
       { protocol: 'http', hostname: 'localhost' },
       { protocol: 'https', hostname: '*.railway.app' },
       { protocol: 'https', hostname: '*.up.railway.app' },
+      // WordPress CDN domains (Jetpack image optimization)
+      { protocol: 'https', hostname: 'i0.wp.com' },
+      { protocol: 'https', hostname: 'i1.wp.com' },
+      { protocol: 'https', hostname: 'i2.wp.com' },
+      { protocol: 'https', hostname: 'i3.wp.com' },
+      { protocol: 'https', hostname: 'secure.gravatar.com' },
     ],
   },
   transpilePackages: ['@ilovefdl/shared'],

@@ -16,6 +16,9 @@ import BlogPostCard from '@/components/BlogPostCard';
 import SpecialCard from '@/components/SpecialCard';
 import type { BlogPost, Special } from '@ilovefdl/shared';
 
+// Re-generate this page at most every 60 seconds (ISR)
+export const revalidate = 60;
+
 async function getLatestPosts(): Promise<BlogPost[]> {
   try {
     const res = await api.getPosts({ limit: 3, status: 'PUBLISHED' });
