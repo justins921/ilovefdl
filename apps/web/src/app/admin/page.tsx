@@ -1403,6 +1403,9 @@ function ProductsSection() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Vendor list for vendor assignment dropdown
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+
   // Form state
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
@@ -1412,6 +1415,7 @@ function ProductsSection() {
   const [formCategoryTags, setFormCategoryTags] = useState('');
   const [formInventory, setFormInventory] = useState('0');
   const [formImages, setFormImages] = useState('');
+  const [formVendorId, setFormVendorId] = useState('');
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -1426,9 +1430,19 @@ function ProductsSection() {
     }
   }, []);
 
+  const fetchVendors = useCallback(async () => {
+    try {
+      const res = await api.getVendors({ limit: 100 });
+      setVendors(res.data);
+    } catch {
+      // Non-fatal: dropdown just won't populate
+    }
+  }, []);
+
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+    fetchVendors();
+  }, [fetchProducts, fetchVendors]);
 
   function resetForm() {
     setFormName('');
@@ -1439,6 +1453,7 @@ function ProductsSection() {
     setFormCategoryTags('');
     setFormInventory('0');
     setFormImages('');
+    setFormVendorId('');
   }
 
   function openCreate() {
@@ -1457,10 +1472,16 @@ function ProductsSection() {
     setFormCategoryTags(product.categoryTags.join(', '));
     setFormInventory(String(product.inventory));
     setFormImages(product.images.join('\n'));
+    setFormVendorId(product.vendorId);
     setShowModal(true);
   }
 
   async function handleSave() {
+    if (!formVendorId) {
+      setError('Please select a vendor for this product.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -1481,7 +1502,10 @@ function ProductsSection() {
           .filter(Boolean),
         isActive: true,
         externalPlatform: ExternalPlatform.NATIVE,
-      };
+        // vendorId is handled separately on the API (admin-only);
+        // it is not part of the Zod schema, so we cast it in.
+        vendorId: formVendorId,
+      } as Parameters<typeof api.createProduct>[0] & { vendorId: string };
 
       if (editingProduct) {
         await api.updateProduct(editingProduct.id, data);
@@ -1660,6 +1684,24 @@ function ProductsSection() {
                   className="input-field w-full"
                   placeholder="product-slug"
                 />
+              </div>
+
+              {/* Vendor */}
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1">Vendor</label>
+                <select
+                  value={formVendorId}
+                  onChange={(e) => setFormVendorId(e.target.value)}
+                  className="input-field w-full"
+                >
+                  <option value="">Select a vendor...</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.businessName}
+                      {v.status !== 'APPROVED' ? ` (${v.status})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Price row */}
